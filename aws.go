@@ -1,0 +1,72 @@
+package pgmultiauth
+
+import (
+	"fmt"
+	"time"
+
+	"github.com/avast/retry-go/v4"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/rds/rdsutils"
+	"github.com/hashicorp/go-hclog"
+)
+
+type awsTokenConfig struct {
+	host     string
+	port     uint16
+	dbRegion string
+	user     string
+}
+
+func getAWSAuthToken(config awsTokenConfig, logger hclog.Logger) (*authToken, error) {
+	var token string
+
+	err := retry.Do(
+		func() error {
+			var err error
+			token, err = fetchAuthToken(config)
+			return err
+		},
+		retry.Attempts(3),
+		retry.Delay(50*time.Millisecond),
+		retry.DelayType(retry.BackOffDelay),
+		retry.OnRetry(func(n uint, err error) {
+			logger.Error("failed to fetch aws token", "attempt", n, "error", err)
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("fetching aws token: %v", err)
+	}
+
+	// The token is valid for 15 minutes, so we set the expiry time to 14 minutes
+	// to account for network delays
+	expiry := time.Now().Add(14 * time.Minute)
+	validFn := func() bool { return time.Now().Before(expiry) }
+
+	return &authToken{token: token, valid: validFn}, nil
+}
+
+func fetchAuthToken(config awsTokenConfig) (string, error) {
+	awsConfig := &aws.Config{
+		Region: aws.String(config.dbRegion),
+	}
+
+	sess, err := session.NewSession(awsConfig)
+	if err != nil {
+		return "", err
+	}
+
+	creds := sess.Config.Credentials
+
+	authToken, err := rdsutils.BuildAuthToken(
+		fmt.Sprintf("%s:%d", config.host, config.port),
+		config.dbRegion,
+		config.user,
+		creds,
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return authToken, nil
+}
