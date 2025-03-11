@@ -20,3 +20,66 @@ The module currently supports:
 
 ```bash
 go get github.com/hashicorp/go-pgmultiauth-beta
+```
+
+
+## Usage
+
+### Using with database/sql
+
+```go
+
+authConfig := pgmultiauth.AuthConfig{
+    DatabaseURL:    "postgres://myuser@mydb.cluster-abc123.us-west-2.rds.amazonaws.com:5432/mydb",
+    Logger:         logger,
+    UseAWSIAMAuth:  true,
+    AWSDBRegion:    "us-west-2",
+}
+
+
+db, err := pgmultiauth.DBHandler(authConfig)
+if err != nil {
+    // handle error
+}
+defer db.Close()
+
+// Use db as a standard database/sql.DB
+```
+
+### Using with pgx connection pool
+```go
+ctx := context.Background()
+pool, err := pgmultiauth.DBPool(ctx, authConfig)
+if err != nil {
+    // handle error
+}
+defer pool.Close()
+
+// Use pool as a standard pgx.Pool
+```
+
+### Using BeforeConnect function of pgxpool.Config
+```go
+beforeConnect, err := pgmultiauth.BeforeConnectFn(authConfig)
+if err != nil {
+    // handle error
+}
+
+poolConfig := pgxpool.Config{
+    ConnConfig: connConfig,
+    BeforeConnect: beforeConnect,
+    ..
+    ..
+}
+```
+
+### Using driver.Connector
+
+```go
+dbConnector, err := pgmultiauth.DBConnector(dbAuthConfig)
+if err != nil {
+    // handle error
+}
+
+db := sql.OpenDB(dbConnector)
+```
