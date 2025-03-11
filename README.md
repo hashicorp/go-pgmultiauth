@@ -19,4 +19,4 @@ The module currently supports:
 ## Installation
 
 ```bash
-go get github.com/hashicorp/pgmultiauth-beta
+go get github.com/hashicorp/go-pgmultiauth-beta
