@@ -14,20 +14,29 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 )
 
+// AuthMethod represents the type of authentication method used
+// for connecting to the database.
+type AuthMethod int
+
+const (
+	NoAuth     AuthMethod = iota // Default value, no authentication
+	AWSIAMAuth                   // AWS IAM authentication
+	GCPAuth                      // GCP authentication
+	AzureAuth
+)
+
 type AuthConfig struct {
 	DatabaseURL string
 	Logger      hclog.Logger
 
-	// AWS IAM Auth
-	UseAWSIAMAuth bool
-	AWSDBRegion   string
+	// Enum to specify the authentication method
+	AuthMethod AuthMethod
 
-	// GCP Auth
-	UseGCPAuth bool
+	// AWS IAM Auth
+	AWSDBRegion string
 
 	// Azure Auth
-	UseAzureAuth bool
-	ClientID     string
+	ClientID string
 }
 
 // validate checks if the AuthConfig has all required fields
@@ -42,24 +51,19 @@ func (ac AuthConfig) validate() error {
 	}
 
 	// Validate auth-specific configurations
-	if ac.UseAWSIAMAuth && ac.AWSDBRegion == "" {
-		return fmt.Errorf("AWSDBRegion is required when UseAWSIAMAuth is true")
-	}
-
-	// Check that only one auth method is selected
-	authMethodCount := 0
-	if ac.UseAWSIAMAuth {
-		authMethodCount++
-	}
-	if ac.UseGCPAuth {
-		authMethodCount++
-	}
-	if ac.UseAzureAuth {
-		authMethodCount++
-	}
-
-	if authMethodCount > 1 {
-		return fmt.Errorf("only one authentication method can be used at a time")
+	switch ac.AuthMethod {
+	case NoAuth, GCPAuth:
+		// No additional validation needed for NoAuth or GCPAuth
+	case AWSIAMAuth:
+		if ac.AWSDBRegion == "" {
+			return fmt.Errorf("AWSDBRegion is required when AuthMethod is AWSIAMAuth")
+		}
+	case AzureAuth:
+		if ac.ClientID == "" {
+			return fmt.Errorf("ClientID is required when AuthMethod is AzureAuth")
+		}
+	default:
+		return fmt.Errorf("unsupported authentication method: %d", ac.AuthMethod)
 	}
 
 	return nil
@@ -67,7 +71,7 @@ func (ac AuthConfig) validate() error {
 
 // authConfigured checks if any authentication method is configured
 func (ac AuthConfig) authConfigured() bool {
-	return ac.UseAWSIAMAuth || ac.UseGCPAuth || ac.UseAzureAuth
+	return ac.AuthMethod != NoAuth
 }
 
 type authToken struct {
@@ -216,16 +220,16 @@ func getAuthToken(authConfig AuthConfig) (*authToken, error) {
 	}
 
 	switch {
-	case authConfig.UseAWSIAMAuth:
+	case authConfig.AuthMethod == AWSIAMAuth:
 		return getAWSAuthToken(awsTokenConfig{
 			host:     connConfig.Host,
 			port:     connConfig.Port,
 			user:     connConfig.User,
 			dbRegion: authConfig.AWSDBRegion,
 		}, authConfig.Logger)
-	case authConfig.UseGCPAuth:
+	case authConfig.AuthMethod == GCPAuth:
 		return getGCPAuthToken(authConfig.Logger)
-	case authConfig.UseAzureAuth:
+	case authConfig.AuthMethod == AzureAuth:
 		return getAzureAuthToken(authConfig.ClientID, authConfig.Logger)
 	default:
 		return nil, fmt.Errorf("unsupported authentication method")
