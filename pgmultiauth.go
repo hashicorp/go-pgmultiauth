@@ -22,9 +22,10 @@ const (
 	NoAuth     AuthMethod = iota // Default value, no authentication
 	AWSIAMAuth                   // AWS IAM authentication
 	GCPAuth                      // GCP authentication
-	AzureAuth
+	AzureAuth                    // Azure authentication
 )
 
+// AuthConfig holds the configuration for database authentication.
 type AuthConfig struct {
 	DatabaseURL string
 	Logger      hclog.Logger
