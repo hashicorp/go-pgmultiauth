@@ -37,7 +37,7 @@ type AuthConfig struct {
 	AWSDBRegion string
 
 	// Azure Auth
-	ClientID string
+	AzureClientID string
 }
 
 // validate checks if the AuthConfig has all required fields
@@ -60,8 +60,8 @@ func (ac AuthConfig) validate() error {
 			return fmt.Errorf("AWSDBRegion is required when AuthMethod is AWSIAMAuth")
 		}
 	case AzureAuth:
-		if ac.ClientID == "" {
-			return fmt.Errorf("ClientID is required when AuthMethod is AzureAuth")
+		if ac.AzureClientID == "" {
+			return fmt.Errorf("AzureClientID is required when AuthMethod is AzureAuth")
 		}
 	default:
 		return fmt.Errorf("unsupported authentication method: %d", ac.AuthMethod)
@@ -80,9 +80,9 @@ type authToken struct {
 	valid func() bool
 }
 
-// DBHandler initializes and returns a *sql.DB database connection
+// OpenDB initializes and returns a *sql.DB database connection
 // using the provided authentication configuration.
-func DBHandler(authConfig AuthConfig) (*sql.DB, error) {
+func OpenDB(authConfig AuthConfig) (*sql.DB, error) {
 	if err := authConfig.validate(); err != nil {
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
@@ -101,9 +101,9 @@ func DBHandler(authConfig AuthConfig) (*sql.DB, error) {
 	return db, nil
 }
 
-// DBConnector initializes and returns a driver.Connector
+// GetConnector initializes and returns a driver.Connector
 // using the provided authentication configuration.
-func DBConnector(authConfig AuthConfig) (driver.Connector, error) {
+func GetConnector(authConfig AuthConfig) (driver.Connector, error) {
 	if err := authConfig.validate(); err != nil {
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
@@ -121,9 +121,9 @@ func DBConnector(authConfig AuthConfig) (driver.Connector, error) {
 	return stdlib.GetConnector(*connConfig, stdlib.OptionBeforeConnect(beforeConnect)), nil
 }
 
-// DBPool initializes and returns a *pgxpool.Pool database connection
+// NewDBPool initializes and returns a *pgxpool.Pool database connection
 // using the provided authentication configuration.
-func DBPool(ctx context.Context, authConfig AuthConfig) (*pgxpool.Pool, error) {
+func NewDBPool(ctx context.Context, authConfig AuthConfig) (*pgxpool.Pool, error) {
 	if err := authConfig.validate(); err != nil {
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
@@ -148,8 +148,8 @@ func DBPool(ctx context.Context, authConfig AuthConfig) (*pgxpool.Pool, error) {
 	return pgxpool.NewWithConfig(ctx, connConfig)
 }
 
-// BeforeConnectFn returns a function that can be used to set the password
-// for a database connection before connecting to the database.
+// BeforeConnectFn returns a function that can be used to set up the
+// authentication before establishing a connection to the database.
 func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConfig) error, error) {
 	if err := authConfig.validate(); err != nil {
 		return nil, fmt.Errorf("invalid authentication configuration: %v", err)
@@ -186,9 +186,9 @@ func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConf
 	return beforeConnect, nil
 }
 
-// DatabaseURL returns the database connection URL based on the provided
+// GetConnectionURL returns the database connection URL based on the provided
 // authentication configuration.
-func DatabaseURL(authConfig AuthConfig) (string, error) {
+func GetConnectionURL(authConfig AuthConfig) (string, error) {
 	if err := authConfig.validate(); err != nil {
 		return "", fmt.Errorf("invalid authentication configuration: %v", err)
 	}
@@ -212,6 +212,22 @@ func DatabaseURL(authConfig AuthConfig) (string, error) {
 	return tokenBasedURL, nil
 }
 
+// GetAuthMode returns the authentication method based on the provided flags.
+// It prioritizes AWS IAM authentication, followed by GCP and Azure authentication.
+// If none of the flags are set, it returns NoAuth.
+func GetAuthMode(useAWSIAMAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMethod {
+	switch {
+	case useAWSIAMAuth:
+		return AWSIAMAuth
+	case useGCPAuth:
+		return GCPAuth
+	case useAzureAuth:
+		return AzureAuth
+	default:
+		return NoAuth
+	}
+}
+
 // getAuthToken returns an authentication token for the database connection
 // based on the provided authentication configuration.
 func getAuthToken(authConfig AuthConfig) (*authToken, error) {
@@ -231,7 +247,7 @@ func getAuthToken(authConfig AuthConfig) (*authToken, error) {
 	case authConfig.AuthMethod == GCPAuth:
 		return getGCPAuthToken(authConfig.Logger)
 	case authConfig.AuthMethod == AzureAuth:
-		return getAzureAuthToken(authConfig.ClientID, authConfig.Logger)
+		return getAzureAuthToken(authConfig.AzureClientID, authConfig.Logger)
 	default:
 		return nil, fmt.Errorf("unsupported authentication method")
 	}
