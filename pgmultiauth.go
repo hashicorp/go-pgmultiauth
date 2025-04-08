@@ -80,9 +80,9 @@ type authToken struct {
 	valid func() bool
 }
 
-// OpenDB initializes and returns a *sql.DB database connection
+// Open initializes and returns a *sql.DB database connection
 // using the provided authentication configuration.
-func OpenDB(authConfig AuthConfig) (*sql.DB, error) {
+func Open(authConfig AuthConfig) (*sql.DB, error) {
 	if err := authConfig.validate(); err != nil {
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
