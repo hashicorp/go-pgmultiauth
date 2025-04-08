@@ -24,7 +24,7 @@ func getAWSAuthToken(config awsTokenConfig, logger hclog.Logger) (*authToken, er
 	err := retry.Do(
 		func() error {
 			var err error
-			token, err = fetchAuthToken(config)
+			token, err = fetchAWSAuthToken(config)
 			return err
 		},
 		retry.Attempts(3),
@@ -46,7 +46,7 @@ func getAWSAuthToken(config awsTokenConfig, logger hclog.Logger) (*authToken, er
 	return &authToken{token: token, valid: validFn}, nil
 }
 
-func fetchAuthToken(config awsTokenConfig) (string, error) {
+func fetchAWSAuthToken(config awsTokenConfig) (string, error) {
 	awsConfig := &aws.Config{
 		Region: aws.String(config.dbRegion),
 	}
