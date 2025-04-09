@@ -96,7 +96,6 @@ func Test_AuthConfig_validate(t *testing.T) {
 			expectedErr: true,
 			errContains: "AWSDBRegion is required when AuthMethod is AWSIAMAuth",
 		},
-
 		{
 			name: "Unsupported auth method",
 			config: AuthConfig{
