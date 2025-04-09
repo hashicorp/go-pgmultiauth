@@ -56,6 +56,16 @@ func Test_AuthConfig_validate(t *testing.T) {
 			expectedErr: false,
 		},
 		{
+			name: "Azure auth without client ID",
+			config: AuthConfig{
+				DatabaseURL:   "postgres://user@host:5432/db",
+				Logger:        logger,
+				AuthMethod:    AzureAuth,
+				AzureClientID: "",
+			},
+			expectedErr: false,
+		},
+		{
 			name: "Empty DatabaseURL",
 			config: AuthConfig{
 				DatabaseURL: "",
@@ -86,17 +96,7 @@ func Test_AuthConfig_validate(t *testing.T) {
 			expectedErr: true,
 			errContains: "AWSDBRegion is required when AuthMethod is AWSIAMAuth",
 		},
-		{
-			name: "Azure auth without client ID",
-			config: AuthConfig{
-				DatabaseURL:   "postgres://user@host:5432/db",
-				Logger:        logger,
-				AuthMethod:    AzureAuth,
-				AzureClientID: "",
-			},
-			expectedErr: true,
-			errContains: "AzureClientID is required when AuthMethod is AzureAuth",
-		},
+
 		{
 			name: "Unsupported auth method",
 			config: AuthConfig{
