@@ -169,9 +169,18 @@ func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConf
 		var tokenMutex sync.Mutex
 
 		beforeConnect = func(ctx context.Context, config *pgx.ConnConfig) error {
+			// no point in contending for lock if we know the token is valid
+			if token.valid() {
+				config.Password = token.token
+				return nil
+			}
+
+			// acquire lock if token is not valid
 			tokenMutex.Lock()
 			defer tokenMutex.Unlock()
 
+			// necessary because multiple connections in the pool might be waiting to acquire tokenMutex after finding the token invalid
+			// and the token might have been refreshed by a connection that acquired the lock first
 			if !token.valid() {
 				authConfig.Logger.Info("refreshing db token")
 				token, err = getAuthTokenWithRetry(authConfig)

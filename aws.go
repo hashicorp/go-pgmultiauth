@@ -17,7 +17,7 @@ type awsTokenConfig struct {
 }
 
 func getAWSAuthToken(config awsTokenConfig) (*authToken, error) {
-	token, err := fetchAuthToken(config)
+	token, err := fetchAWSAuthToken(config)
 	if err != nil {
 		return nil, fmt.Errorf("fetching aws token: %v", err)
 	}
@@ -30,7 +30,7 @@ func getAWSAuthToken(config awsTokenConfig) (*authToken, error) {
 	return &authToken{token: token, valid: validFn}, nil
 }
 
-func fetchAuthToken(config awsTokenConfig) (string, error) {
+func fetchAWSAuthToken(config awsTokenConfig) (string, error) {
 	awsConfig := &aws.Config{
 		Region: aws.String(config.dbRegion),
 	}
