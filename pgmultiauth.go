@@ -36,9 +36,13 @@ type AuthConfig struct {
 	AuthMethod AuthMethod
 
 	// AWS IAM Auth
+	// Required when AuthMethod is AWSIAMAuth
 	AWSDBRegion string
 
 	// Azure Auth
+	// Client ID of a Managed Service Identity.
+	// Set this field to use a user-assigned managed identity instead of
+	// system-assigned managed identity.
 	AzureClientID string
 }
 
@@ -298,9 +302,14 @@ func replaceDBPassword(connectionURL string, newPassword string) (string, error)
 		return "", fmt.Errorf("failed to parse connection URL: %w", err)
 	}
 
+	var username string
+	if u.User != nil {
+		username = u.User.Username()
+	}
+
 	dbURL := fmt.Sprintf("%s://%s:%s@%s%s",
 		u.Scheme,
-		url.QueryEscape(u.User.Username()),
+		url.QueryEscape(username),
 		url.QueryEscape(newPassword),
 		u.Host,
 		u.Path,
