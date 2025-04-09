@@ -155,7 +155,8 @@ func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConf
 		return nil, fmt.Errorf("invalid authentication configuration: %v", err)
 	}
 
-	var beforeConnect func(context.Context, *pgx.ConnConfig) error
+	// noop before connect by default
+	beforeConnect := func(context.Context, *pgx.ConnConfig) error { return nil }
 
 	if authConfig.authConfigured() {
 		authConfig.Logger.Info("getting initial db auth token")
