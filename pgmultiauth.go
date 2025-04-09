@@ -237,8 +237,16 @@ func getAuthTokenWithRetry(authConfig AuthConfig) (*authToken, error) {
 	var token *authToken
 	var err error
 
+	count := 0
+
 	err = retry.Do(
 		func() error {
+			if count < 2 {
+				count++
+				authConfig.Logger.Info("failing explicitely")
+				return fmt.Errorf("explicit failure")
+			}
+
 			token, err = getAuthToken(authConfig)
 			return err
 		},
