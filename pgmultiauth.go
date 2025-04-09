@@ -53,15 +53,11 @@ func (ac AuthConfig) validate() error {
 
 	// Validate auth-specific configurations
 	switch ac.AuthMethod {
-	case NoAuth, GCPAuth:
+	case NoAuth, GCPAuth, AzureAuth:
 		// No additional validation needed for NoAuth or GCPAuth
 	case AWSIAMAuth:
 		if ac.AWSDBRegion == "" {
 			return fmt.Errorf("AWSDBRegion is required when AuthMethod is AWSIAMAuth")
-		}
-	case AzureAuth:
-		if ac.AzureClientID == "" {
-			return fmt.Errorf("AzureClientID is required when AuthMethod is AzureAuth")
 		}
 	default:
 		return fmt.Errorf("unsupported authentication method: %d", ac.AuthMethod)
