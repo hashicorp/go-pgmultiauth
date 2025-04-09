@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/avast/retry-go/v4"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/rds/rdsutils"
-	"github.com/hashicorp/go-hclog"
 )
 
 type awsTokenConfig struct {
@@ -18,22 +16,8 @@ type awsTokenConfig struct {
 	user     string
 }
 
-func getAWSAuthToken(config awsTokenConfig, logger hclog.Logger) (*authToken, error) {
-	var token string
-
-	err := retry.Do(
-		func() error {
-			var err error
-			token, err = fetchAWSAuthToken(config)
-			return err
-		},
-		retry.Attempts(3),
-		retry.Delay(50*time.Millisecond),
-		retry.DelayType(retry.BackOffDelay),
-		retry.OnRetry(func(n uint, err error) {
-			logger.Error("failed to fetch aws token", "attempt", n, "error", err)
-		}),
-	)
+func getAWSAuthToken(config awsTokenConfig) (*authToken, error) {
+	token, err := fetchAWSAuthToken(config)
 	if err != nil {
 		return nil, fmt.Errorf("fetching aws token: %v", err)
 	}
