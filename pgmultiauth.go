@@ -9,11 +9,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/avast/retry-go/v4"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/hashicorp/go-hclog"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
+	"golang.org/x/oauth2/google"
 )
 
 // AuthMethod represents the type of authentication method used
@@ -36,10 +39,13 @@ type AuthConfig struct {
 	AuthMethod AuthMethod
 
 	// AWS IAM Auth
-	AWSDBRegion string
+	AWSConfig *aws.Config
 
 	// Azure Auth
-	AzureClientID string
+	AzureCreds azcore.TokenCredential
+
+	// GCP Auth
+	GoogleCreds *google.Credentials
 }
 
 // validate checks if the AuthConfig has all required fields
@@ -55,11 +61,19 @@ func (ac AuthConfig) validate() error {
 
 	// Validate auth-specific configurations
 	switch ac.AuthMethod {
-	case NoAuth, GCPAuth, AzureAuth:
-		// No additional validation needed for NoAuth or GCPAuth
+	case NoAuth:
+		// No additional validation needed for NoAuth
 	case AWSIAMAuth:
-		if ac.AWSDBRegion == "" {
-			return fmt.Errorf("AWSDBRegion is required when AuthMethod is AWSIAMAuth")
+		if ac.AWSConfig == nil {
+			return fmt.Errorf("AWSConfig is required when AuthMethod is AWSIAMAuth")
+		}
+	case AzureAuth:
+		if ac.AzureCreds == nil {
+			return fmt.Errorf("AzureCreds is required when AuthMethod is AzureAuth")
+		}
+	case GCPAuth:
+		if ac.GoogleCreds == nil {
+			return fmt.Errorf("GoogleCreds is required when AuthMethod is GCPAuth")
 		}
 	default:
 		return fmt.Errorf("unsupported authentication method: %d", ac.AuthMethod)
@@ -273,15 +287,15 @@ func getAuthToken(authConfig AuthConfig) (*authToken, error) {
 	switch {
 	case authConfig.AuthMethod == AWSIAMAuth:
 		return getAWSAuthToken(awsTokenConfig{
-			host:     connConfig.Host,
-			port:     connConfig.Port,
-			user:     connConfig.User,
-			dbRegion: authConfig.AWSDBRegion,
+			host:      connConfig.Host,
+			port:      connConfig.Port,
+			user:      connConfig.User,
+			awsConfig: authConfig.AWSConfig,
 		})
 	case authConfig.AuthMethod == GCPAuth:
-		return getGCPAuthToken()
+		return getGCPAuthToken(authConfig.GoogleCreds)
 	case authConfig.AuthMethod == AzureAuth:
-		return getAzureAuthToken(authConfig.AzureClientID)
+		return getAzureAuthToken(authConfig.AzureCreds)
 	default:
 		return nil, fmt.Errorf("unsupported authentication method")
 	}
