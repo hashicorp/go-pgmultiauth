@@ -3,8 +3,10 @@ package pgmultiauth
 import (
 	"testing"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2/google"
 )
 
 func Test_AuthConfig_validate(t *testing.T) {
@@ -32,7 +34,7 @@ func Test_AuthConfig_validate(t *testing.T) {
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  AWSIAMAuth,
-				AWSDBRegion: "us-west-2",
+				AWSConfig:   &aws.Config{},
 			},
 			expectedErr: false,
 		},
@@ -42,16 +44,17 @@ func Test_AuthConfig_validate(t *testing.T) {
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  GCPAuth,
+				GoogleCreds: &google.Credentials{},
 			},
 			expectedErr: false,
 		},
 		{
 			name: "Valid config with Azure auth",
 			config: AuthConfig{
-				DatabaseURL:   "postgres://user@host:5432/db",
-				Logger:        logger,
-				AuthMethod:    AzureAuth,
-				AzureClientID: "client-id-123",
+				DatabaseURL: "postgres://user@host:5432/db",
+				Logger:      logger,
+				AuthMethod:  AzureAuth,
+				AzureCreds:  &MockTokenCredential{},
 			},
 			expectedErr: false,
 		},
@@ -76,26 +79,24 @@ func Test_AuthConfig_validate(t *testing.T) {
 			errContains: "logger cannot be nil",
 		},
 		{
-			name: "AWS auth without region",
+			name: "AWS auth without aws config",
 			config: AuthConfig{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  AWSIAMAuth,
-				AWSDBRegion: "",
 			},
 			expectedErr: true,
-			errContains: "AWSDBRegion is required when AuthMethod is AWSIAMAuth",
+			errContains: "AWSConfig is required when AuthMethod is AWSIAMAuth",
 		},
 		{
-			name: "Azure auth without client ID",
+			name: "Azure auth without AzureCreds",
 			config: AuthConfig{
-				DatabaseURL:   "postgres://user@host:5432/db",
-				Logger:        logger,
-				AuthMethod:    AzureAuth,
-				AzureClientID: "",
+				DatabaseURL: "postgres://user@host:5432/db",
+				Logger:      logger,
+				AuthMethod:  AzureAuth,
 			},
 			expectedErr: true,
-			errContains: "AzureClientID is required when AuthMethod is AzureAuth",
+			errContains: "AzureCreds is required when AuthMethod is AzureAuth",
 		},
 		{
 			name: "Unsupported auth method",
@@ -149,7 +150,7 @@ func Test_AuthConfig_authConfigured(t *testing.T) {
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  AWSIAMAuth,
-				AWSDBRegion: "us-west-2",
+				AWSConfig:   &aws.Config{},
 			},
 			expected: true,
 		},
@@ -165,10 +166,10 @@ func Test_AuthConfig_authConfigured(t *testing.T) {
 		{
 			name: "Azure authentication configured",
 			config: AuthConfig{
-				DatabaseURL:   "postgres://user@host:5432/db",
-				Logger:        logger,
-				AuthMethod:    AzureAuth,
-				AzureClientID: "client-id-123",
+				DatabaseURL: "postgres://user@host:5432/db",
+				Logger:      logger,
+				AuthMethod:  AzureAuth,
+				AzureCreds:  &MockTokenCredential{},
 			},
 			expected: true,
 		},

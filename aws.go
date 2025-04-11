@@ -5,15 +5,14 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/rds/rdsutils"
 )
 
 type awsTokenConfig struct {
-	host     string
-	port     uint16
-	dbRegion string
-	user     string
+	host      string
+	port      uint16
+	user      string
+	awsConfig *aws.Config
 }
 
 func getAWSAuthToken(config awsTokenConfig) (*authToken, error) {
@@ -31,20 +30,12 @@ func getAWSAuthToken(config awsTokenConfig) (*authToken, error) {
 }
 
 func fetchAWSAuthToken(config awsTokenConfig) (string, error) {
-	awsConfig := &aws.Config{
-		Region: aws.String(config.dbRegion),
-	}
-
-	sess, err := session.NewSession(awsConfig)
-	if err != nil {
-		return "", err
-	}
-
-	creds := sess.Config.Credentials
+	creds := config.awsConfig.Credentials
+	region := *config.awsConfig.Region
 
 	authToken, err := rdsutils.BuildAuthToken(
 		fmt.Sprintf("%s:%d", config.host, config.port),
-		config.dbRegion,
+		region,
 		config.user,
 		creds,
 	)
