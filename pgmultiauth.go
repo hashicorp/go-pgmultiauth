@@ -39,12 +39,15 @@ type AuthConfig struct {
 	AuthMethod AuthMethod
 
 	// AWS IAM Auth
+	// Required if AuthMethod is AWSIAMAuth
 	AWSConfig *aws.Config
 
 	// Azure Auth
+	// Required if AuthMethod is AzureAuth
 	AzureCreds azcore.TokenCredential
 
 	// GCP Auth
+	// Required if AuthMethod is GCPAuth
 	GoogleCreds *google.Credentials
 }
 
@@ -309,9 +312,14 @@ func replaceDBPassword(connectionURL string, newPassword string) (string, error)
 		return "", fmt.Errorf("failed to parse connection URL: %w", err)
 	}
 
+	var username string
+	if u.User != nil {
+		username = u.User.Username()
+	}
+
 	dbURL := fmt.Sprintf("%s://%s:%s@%s%s",
 		u.Scheme,
-		url.QueryEscape(u.User.Username()),
+		url.QueryEscape(username),
 		url.QueryEscape(newPassword),
 		u.Host,
 		u.Path,
