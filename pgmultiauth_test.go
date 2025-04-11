@@ -89,7 +89,7 @@ func Test_AuthConfig_validate(t *testing.T) {
 			errContains: "AWSConfig is required when AuthMethod is AWSIAMAuth",
 		},
 		{
-			name: "Azure auth without client ID",
+			name: "Azure auth without AzureCreds",
 			config: AuthConfig{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
