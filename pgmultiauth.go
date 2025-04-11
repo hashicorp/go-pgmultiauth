@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"net/url"
 	"sync"
+	"time"
 
+	"github.com/avast/retry-go/v4"
 	"github.com/hashicorp/go-hclog"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -156,7 +158,7 @@ func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConf
 
 	if authConfig.authConfigured() {
 		authConfig.Logger.Info("getting initial db auth token")
-		token, err := getAuthToken(authConfig)
+		token, err := getAuthTokenWithRetry(authConfig)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get initial db token: %v", err)
 		}
@@ -178,7 +180,7 @@ func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConf
 			// and the token might have been refreshed by a connection that acquired the lock first
 			if !token.valid() {
 				authConfig.Logger.Info("refreshing db token")
-				token, err = getAuthToken(authConfig)
+				token, err = getAuthTokenWithRetry(authConfig)
 				if err != nil {
 					return fmt.Errorf("failed to get db token: %v", err)
 				}
@@ -203,7 +205,7 @@ func GetConnectionURL(authConfig AuthConfig) (string, error) {
 		return authConfig.DatabaseURL, nil
 	}
 
-	token, err := getAuthToken(authConfig)
+	token, err := getAuthTokenWithRetry(authConfig)
 	if err != nil {
 		return "", fmt.Errorf("fetching auth token: %v", err)
 	}
@@ -234,6 +236,32 @@ func GetAuthMode(useAWSIAMAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMet
 	}
 }
 
+// getAuthTokenWithRetry attempts to fetch an authentication token
+// with retries in case of failure. It uses exponential backoff
+// for retrying the request.
+func getAuthTokenWithRetry(authConfig AuthConfig) (*authToken, error) {
+	var token *authToken
+	var err error
+
+	err = retry.Do(
+		func() error {
+			token, err = getAuthToken(authConfig)
+			return err
+		},
+		retry.Attempts(3),
+		retry.Delay(50*time.Millisecond),
+		retry.DelayType(retry.BackOffDelay),
+		retry.OnRetry(func(n uint, err error) {
+			authConfig.Logger.Error("failed to fetch auth token", "attempt", n, "error", err)
+		}),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("fetching auth token: %v", err)
+	}
+
+	return token, nil
+}
+
 // getAuthToken returns an authentication token for the database connection
 // based on the provided authentication configuration.
 func getAuthToken(authConfig AuthConfig) (*authToken, error) {
@@ -249,11 +277,11 @@ func getAuthToken(authConfig AuthConfig) (*authToken, error) {
 			port:     connConfig.Port,
 			user:     connConfig.User,
 			dbRegion: authConfig.AWSDBRegion,
-		}, authConfig.Logger)
+		})
 	case authConfig.AuthMethod == GCPAuth:
-		return getGCPAuthToken(authConfig.Logger)
+		return getGCPAuthToken()
 	case authConfig.AuthMethod == AzureAuth:
-		return getAzureAuthToken(authConfig.AzureClientID, authConfig.Logger)
+		return getAzureAuthToken(authConfig.AzureClientID)
 	default:
 		return nil, fmt.Errorf("unsupported authentication method")
 	}
