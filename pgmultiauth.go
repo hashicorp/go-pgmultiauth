@@ -55,15 +55,11 @@ func (ac AuthConfig) validate() error {
 
 	// Validate auth-specific configurations
 	switch ac.AuthMethod {
-	case NoAuth, GCPAuth:
+	case NoAuth, GCPAuth, AzureAuth:
 		// No additional validation needed for NoAuth or GCPAuth
 	case AWSIAMAuth:
 		if ac.AWSDBRegion == "" {
 			return fmt.Errorf("AWSDBRegion is required when AuthMethod is AWSIAMAuth")
-		}
-	case AzureAuth:
-		if ac.AzureClientID == "" {
-			return fmt.Errorf("AzureClientID is required when AuthMethod is AzureAuth")
 		}
 	default:
 		return fmt.Errorf("unsupported authentication method: %d", ac.AuthMethod)
@@ -157,7 +153,8 @@ func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConf
 		return nil, fmt.Errorf("invalid authentication configuration: %v", err)
 	}
 
-	var beforeConnect func(context.Context, *pgx.ConnConfig) error
+	// noop before connect by default
+	beforeConnect := func(context.Context, *pgx.ConnConfig) error { return nil }
 
 	if authConfig.authConfigured() {
 		authConfig.Logger.Info("getting initial db auth token")
