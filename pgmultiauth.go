@@ -25,7 +25,7 @@ type AuthMethod int
 
 const (
 	NoAuth    AuthMethod = iota // Default value, no authentication
-	AWSAuth                     // AWS IAM authentication
+	AWSAuth                     // AWS authentication
 	GCPAuth                     // GCP authentication
 	AzureAuth                   // Azure authentication
 )
@@ -38,7 +38,7 @@ type AuthConfig struct {
 	// Enum to specify the authentication method
 	AuthMethod AuthMethod
 
-	// AWS IAM Auth
+	// AWS Auth
 	// Required if AuthMethod is AWSAuth
 	AWSConfig *aws.Config
 
@@ -233,7 +233,7 @@ func GetConnectionURL(authConfig AuthConfig) (string, error) {
 }
 
 // GetAuthMode returns the authentication method based on the provided flags.
-// It prioritizes AWS IAM authentication, followed by GCP and Azure authentication.
+// It prioritizes AWS authentication, followed by GCP and Azure authentication.
 // If none of the flags are set, it returns NoAuth.
 func GetAuthMode(useAWSAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMethod {
 	switch {
