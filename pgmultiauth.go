@@ -24,10 +24,10 @@ import (
 type AuthMethod int
 
 const (
-	NoAuth     AuthMethod = iota // Default value, no authentication
-	AWSIAMAuth                   // AWS IAM authentication
-	GCPAuth                      // GCP authentication
-	AzureAuth                    // Azure authentication
+	NoAuth    AuthMethod = iota // Default value, no authentication
+	AWSAuth                     // AWS IAM authentication
+	GCPAuth                     // GCP authentication
+	AzureAuth                   // Azure authentication
 )
 
 // AuthConfig holds the configuration for database authentication.
@@ -39,7 +39,7 @@ type AuthConfig struct {
 	AuthMethod AuthMethod
 
 	// AWS IAM Auth
-	// Required if AuthMethod is AWSIAMAuth
+	// Required if AuthMethod is AWSAuth
 	AWSConfig *aws.Config
 
 	// Azure Auth
@@ -66,9 +66,9 @@ func (ac AuthConfig) validate() error {
 	switch ac.AuthMethod {
 	case NoAuth:
 		// No additional validation needed for NoAuth
-	case AWSIAMAuth:
+	case AWSAuth:
 		if ac.AWSConfig == nil {
-			return fmt.Errorf("AWSConfig is required when AuthMethod is AWSIAMAuth")
+			return fmt.Errorf("AWSConfig is required when AuthMethod is AWSAuth")
 		}
 	case AzureAuth:
 		if ac.AzureCreds == nil {
@@ -88,11 +88,6 @@ func (ac AuthConfig) validate() error {
 // authConfigured checks if any authentication method is configured
 func (ac AuthConfig) authConfigured() bool {
 	return ac.AuthMethod != NoAuth
-}
-
-type authToken struct {
-	token string
-	valid func() bool
 }
 
 // Open initializes and returns a *sql.DB database connection
@@ -240,10 +235,10 @@ func GetConnectionURL(authConfig AuthConfig) (string, error) {
 // GetAuthMode returns the authentication method based on the provided flags.
 // It prioritizes AWS IAM authentication, followed by GCP and Azure authentication.
 // If none of the flags are set, it returns NoAuth.
-func GetAuthMode(useAWSIAMAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMethod {
+func GetAuthMode(useAWSAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMethod {
 	switch {
-	case useAWSIAMAuth:
-		return AWSIAMAuth
+	case useAWSAuth:
+		return AWSAuth
 	case useGCPAuth:
 		return GCPAuth
 	case useAzureAuth:
@@ -279,29 +274,49 @@ func getAuthTokenWithRetry(authConfig AuthConfig) (*authToken, error) {
 	return token, nil
 }
 
+type authToken struct {
+	token string
+	valid func() bool
+}
+
+// tokenGenerator is an interface that defines a method for generating
+// authentication tokens. This allows for different implementations
+// for different authentication methods (AWS, GCP, Azure).
+type tokenGenerator interface {
+	generateToken() (*authToken, error)
+}
+
 // getAuthToken returns an authentication token for the database connection
 // based on the provided authentication configuration.
 func getAuthToken(authConfig AuthConfig) (*authToken, error) {
-	connConfig, err := pgx.ParseConfig(authConfig.DatabaseURL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse connection string: %v", err)
-	}
+	var tokenGenerator tokenGenerator
 
 	switch {
-	case authConfig.AuthMethod == AWSIAMAuth:
-		return getAWSAuthToken(awsTokenConfig{
+	case authConfig.AuthMethod == AWSAuth:
+		connConfig, err := pgx.ParseConfig(authConfig.DatabaseURL)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse connection string: %v", err)
+		}
+
+		tokenGenerator = awsTokenConfig{
 			host:      connConfig.Host,
 			port:      connConfig.Port,
 			user:      connConfig.User,
 			awsConfig: authConfig.AWSConfig,
-		})
+		}
 	case authConfig.AuthMethod == GCPAuth:
-		return getGCPAuthToken(authConfig.GoogleCreds)
+		tokenGenerator = gcpTokenConfig{
+			creds: authConfig.GoogleCreds,
+		}
 	case authConfig.AuthMethod == AzureAuth:
-		return getAzureAuthToken(authConfig.AzureCreds)
+		tokenGenerator = azureTokenConfig{
+			creds: authConfig.AzureCreds,
+		}
 	default:
-		return nil, fmt.Errorf("unsupported authentication method")
+		return nil, fmt.Errorf("unsupported authentication method: %d", authConfig.AuthMethod)
 	}
+
+	return tokenGenerator.generateToken()
 }
 
 // replaceDBPassword replaces the password in a PostgreSQL connection URL
