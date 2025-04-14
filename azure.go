@@ -9,8 +9,12 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 )
 
-func getAzureAuthToken(azureCreds azcore.TokenCredential) (*authToken, error) {
-	token, err := fetchAzureAuthToken(azureCreds)
+type azureTokenConfig struct {
+	creds azcore.TokenCredential
+}
+
+func (c azureTokenConfig) generateToken() (*authToken, error) {
+	token, err := c.fetchAzureAuthToken()
 	if err != nil {
 		return nil, fmt.Errorf("fetching azure token: %v", err)
 	}
@@ -22,9 +26,9 @@ func getAzureAuthToken(azureCreds azcore.TokenCredential) (*authToken, error) {
 	return &authToken{token: token.Token, valid: validFn}, nil
 }
 
-func fetchAzureAuthToken(azureCreds azcore.TokenCredential) (azcore.AccessToken, error) {
+func (c azureTokenConfig) fetchAzureAuthToken() (azcore.AccessToken, error) {
 	ctx := context.Background()
-	token, err := azureCreds.GetToken(ctx, policy.TokenRequestOptions{
+	token, err := c.creds.GetToken(ctx, policy.TokenRequestOptions{
 		Scopes: []string{"https://ossrdbms-aad.database.windows.net/.default"},
 	})
 	if err != nil {
