@@ -7,11 +7,10 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 )
 
-func getAzureAuthToken(clientID string) (*authToken, error) {
-	token, err := fetchAzureAuthToken(clientID)
+func getAzureAuthToken(azureCreds azcore.TokenCredential) (*authToken, error) {
+	token, err := fetchAzureAuthToken(azureCreds)
 	if err != nil {
 		return nil, fmt.Errorf("fetching azure token: %v", err)
 	}
@@ -23,19 +22,9 @@ func getAzureAuthToken(clientID string) (*authToken, error) {
 	return &authToken{token: token.Token, valid: validFn}, nil
 }
 
-func fetchAzureAuthToken(clientID string) (azcore.AccessToken, error) {
-	msiCredOpts := &azidentity.ManagedIdentityCredentialOptions{}
-	if clientID != "" {
-		msiCredOpts.ID = azidentity.ClientID(clientID)
-	}
-
-	msiCreds, err := azidentity.NewManagedIdentityCredential(msiCredOpts)
-	if err != nil {
-		return azcore.AccessToken{}, fmt.Errorf("failed to create Azure managed identity credential (MSI): %w", err)
-	}
-
+func fetchAzureAuthToken(azureCreds azcore.TokenCredential) (azcore.AccessToken, error) {
 	ctx := context.Background()
-	token, err := msiCreds.GetToken(ctx, policy.TokenRequestOptions{
+	token, err := azureCreds.GetToken(ctx, policy.TokenRequestOptions{
 		Scopes: []string{"https://ossrdbms-aad.database.windows.net/.default"},
 	})
 	if err != nil {

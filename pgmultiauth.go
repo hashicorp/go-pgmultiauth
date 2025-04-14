@@ -9,12 +9,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/avast/retry-go/v4"
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/hashicorp/go-hclog"
 	vault "github.com/hashicorp/vault/api"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
+	"golang.org/x/oauth2/google"
 )
 
 // AuthMethod represents the type of authentication method used
@@ -38,10 +41,16 @@ type AuthConfig struct {
 	AuthMethod AuthMethod
 
 	// AWS IAM Auth
-	AWSDBRegion string
+	// Required if AuthMethod is AWSIAMAuth
+	AWSConfig *aws.Config
 
 	// Azure Auth
-	AzureClientID string
+	// Required if AuthMethod is AzureAuth
+	AzureCreds azcore.TokenCredential
+
+	// GCP Auth
+	// Required if AuthMethod is GCPAuth
+	GoogleCreds *google.Credentials
 
 	// Vault Auth
 	VaultClient     *vault.Client
@@ -61,15 +70,19 @@ func (ac AuthConfig) validate() error {
 
 	// Validate auth-specific configurations
 	switch ac.AuthMethod {
-	case NoAuth, GCPAuth:
-		// No additional validation needed for NoAuth or GCPAuth
+	case NoAuth:
+		// No additional validation needed for NoAuth
 	case AWSIAMAuth:
-		if ac.AWSDBRegion == "" {
-			return fmt.Errorf("AWSDBRegion is required when AuthMethod is AWSIAMAuth")
+		if ac.AWSConfig == nil {
+			return fmt.Errorf("AWSConfig is required when AuthMethod is AWSIAMAuth")
 		}
 	case AzureAuth:
-		if ac.AzureClientID == "" {
-			return fmt.Errorf("AzureClientID is required when AuthMethod is AzureAuth")
+		if ac.AzureCreds == nil {
+			return fmt.Errorf("AzureCreds is required when AuthMethod is AzureAuth")
+		}
+	case GCPAuth:
+		if ac.GoogleCreds == nil {
+			return fmt.Errorf("GoogleCreds is required when AuthMethod is GCPAuth")
 		}
 	case VaultAuth:
 		if ac.VaultClient == nil {
@@ -171,7 +184,8 @@ func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConf
 		return nil, fmt.Errorf("invalid authentication configuration: %v", err)
 	}
 
-	var beforeConnect func(context.Context, *pgx.ConnConfig) error
+	// noop before connect by default
+	beforeConnect := func(context.Context, *pgx.ConnConfig) error { return nil }
 
 	if authConfig.authConfigured() {
 		authConfig.Logger.Info("getting initial db auth token")
@@ -298,15 +312,15 @@ func getAuthToken(authConfig AuthConfig) (*authToken, error) {
 	switch {
 	case authConfig.AuthMethod == AWSIAMAuth:
 		return getAWSAuthToken(awsTokenConfig{
-			host:     connConfig.Host,
-			port:     connConfig.Port,
-			user:     connConfig.User,
-			dbRegion: authConfig.AWSDBRegion,
+			host:      connConfig.Host,
+			port:      connConfig.Port,
+			user:      connConfig.User,
+			awsConfig: authConfig.AWSConfig,
 		})
 	case authConfig.AuthMethod == GCPAuth:
-		return getGCPAuthToken()
+		return getGCPAuthToken(authConfig.GoogleCreds)
 	case authConfig.AuthMethod == AzureAuth:
-		return getAzureAuthToken(authConfig.AzureClientID)
+		return getAzureAuthToken(authConfig.AzureCreds)
 	case authConfig.AuthMethod == VaultAuth:
 		return getVaultAuthToken(vaultConfig{
 			client:     authConfig.VaultClient,
@@ -325,9 +339,14 @@ func replaceDBPassword(connectionURL string, newPassword string) (string, error)
 		return "", fmt.Errorf("failed to parse connection URL: %w", err)
 	}
 
+	var username string
+	if u.User != nil {
+		username = u.User.Username()
+	}
+
 	dbURL := fmt.Sprintf("%s://%s:%s@%s%s",
 		u.Scheme,
-		url.QueryEscape(u.User.Username()),
+		url.QueryEscape(username),
 		url.QueryEscape(newPassword),
 		u.Host,
 		u.Path,
