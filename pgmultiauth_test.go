@@ -191,6 +191,7 @@ func Test_GetAuthMode(t *testing.T) {
 		useAWSIAMAuth bool
 		useGCPAuth    bool
 		useAzureAuth  bool
+		useVaultAuth  bool
 		want          AuthMethod
 	}{
 		{
@@ -253,7 +254,7 @@ func Test_GetAuthMode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GetAuthMode(tt.useAWSIAMAuth, tt.useGCPAuth, tt.useAzureAuth)
+			got := GetAuthMode(tt.useAWSIAMAuth, tt.useGCPAuth, tt.useAzureAuth, tt.useVaultAuth)
 			if got != tt.want {
 				t.Errorf("GetAuthMode() = %v, want %v", got, tt.want)
 			}
@@ -272,7 +273,7 @@ func Test_replaceDBPassword(t *testing.T) {
 		{
 			name:        "Basic URL with password",
 			inputURL:    "postgres://user:oldpass@localhost:5432/mydb",
-			newPassword: "newpass",
+			newPassword: "iam-sa@hc-b81d62ce151549b39d6f58998fd.iam.gserviceaccount.com",
 			expectedURL: "postgres://user:newpass@localhost:5432/mydb",
 			expectError: false,
 		},

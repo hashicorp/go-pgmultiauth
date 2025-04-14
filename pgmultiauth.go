@@ -13,6 +13,7 @@ import (
 	"github.com/avast/retry-go/v4"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/hashicorp/go-hclog"
+	vault "github.com/hashicorp/vault/api"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -28,6 +29,7 @@ const (
 	AWSIAMAuth                   // AWS IAM authentication
 	GCPAuth                      // GCP authentication
 	AzureAuth                    // Azure authentication
+	VaultAuth                    // Vault authentication
 )
 
 // AuthConfig holds the configuration for database authentication.
@@ -49,6 +51,10 @@ type AuthConfig struct {
 	// GCP Auth
 	// Required if AuthMethod is GCPAuth
 	GoogleCreds *google.Credentials
+
+	// Vault Auth
+	VaultClient     *vault.Client
+	VaultSecretPath string
 }
 
 // validate checks if the AuthConfig has all required fields
@@ -78,6 +84,13 @@ func (ac AuthConfig) validate() error {
 		if ac.GoogleCreds == nil {
 			return fmt.Errorf("GoogleCreds is required when AuthMethod is GCPAuth")
 		}
+	case VaultAuth:
+		if ac.VaultClient == nil {
+			return fmt.Errorf("VaultClient is required when AuthMethod is VaultAuth")
+		}
+		if ac.VaultSecretPath == "" {
+			return fmt.Errorf("VaultSecretPath is required when AuthMethod is VaultAuth")
+		}
 	default:
 		return fmt.Errorf("unsupported authentication method: %d", ac.AuthMethod)
 	}
@@ -91,8 +104,9 @@ func (ac AuthConfig) authConfigured() bool {
 }
 
 type authToken struct {
-	token string
-	valid func() bool
+	username string
+	token    string
+	valid    func() bool
 }
 
 // Open initializes and returns a *sql.DB database connection
@@ -185,6 +199,9 @@ func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConf
 		beforeConnect = func(ctx context.Context, config *pgx.ConnConfig) error {
 			// no point in contending for lock if we know the token is valid
 			if token.valid() {
+				if token.username != "" {
+					config.User = token.username
+				}
 				config.Password = token.token
 				return nil
 			}
@@ -203,6 +220,9 @@ func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConf
 				}
 			}
 
+			if token.username != "" {
+				config.User = token.username
+			}
 			config.Password = token.token
 			return nil
 		}
@@ -238,9 +258,9 @@ func GetConnectionURL(authConfig AuthConfig) (string, error) {
 }
 
 // GetAuthMode returns the authentication method based on the provided flags.
-// It prioritizes AWS IAM authentication, followed by GCP and Azure authentication.
+// It prioritizes AWS IAM authentication, followed by GCP, Azure and Vault authentication.
 // If none of the flags are set, it returns NoAuth.
-func GetAuthMode(useAWSIAMAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMethod {
+func GetAuthMode(useAWSIAMAuth bool, useGCPAuth bool, useAzureAuth bool, useVaultAuth bool) AuthMethod {
 	switch {
 	case useAWSIAMAuth:
 		return AWSIAMAuth
@@ -248,6 +268,8 @@ func GetAuthMode(useAWSIAMAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMet
 		return GCPAuth
 	case useAzureAuth:
 		return AzureAuth
+	case useVaultAuth:
+		return VaultAuth
 	default:
 		return NoAuth
 	}
@@ -299,6 +321,11 @@ func getAuthToken(authConfig AuthConfig) (*authToken, error) {
 		return getGCPAuthToken(authConfig.GoogleCreds)
 	case authConfig.AuthMethod == AzureAuth:
 		return getAzureAuthToken(authConfig.AzureCreds)
+	case authConfig.AuthMethod == VaultAuth:
+		return getVaultAuthToken(vaultConfig{
+			client:     authConfig.VaultClient,
+			secretPath: authConfig.VaultSecretPath,
+		})
 	default:
 		return nil, fmt.Errorf("unsupported authentication method")
 	}
