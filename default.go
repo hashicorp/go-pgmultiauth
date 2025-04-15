@@ -39,7 +39,7 @@ func DefaultCloudAuthConfig(dbURL string, logger hclog.Logger, opts CloudAuthCon
 	var azureCreds azcore.TokenCredential
 	var awsConfig *aws.Config
 
-	if authMode == AWSIAMAuth {
+	if authMode == AWSAuth {
 		if opts.AWSDBRegion == "" {
 			return AuthConfig{}, fmt.Errorf("AWSDBRegion is required for AWS IAM authentication")
 		}
@@ -89,7 +89,7 @@ func DefaultCloudAuthConfig(dbURL string, logger hclog.Logger, opts CloudAuthCon
 func GetAuthMode(useAWSIAMAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMethod {
 	switch {
 	case useAWSIAMAuth:
-		return AWSIAMAuth
+		return AWSAuth
 	case useGCPAuth:
 		return GCPAuth
 	case useAzureAuth:
