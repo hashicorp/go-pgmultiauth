@@ -1,4 +1,4 @@
-# go-pgmultiauth-beta
+# go-pgmultiauth
 
 pgmultiauth is a Go module that simplifies and streamlines authentication with PostgreSQL databases using multiple authentication methods. It provides a unified interface for connecting to PostgreSQL databases using various cloud authentication mechanisms.
 
@@ -19,7 +19,7 @@ The module currently supports:
 ## Installation
 
 ```bash
-go get github.com/hashicorp/go-pgmultiauth-beta
+go get github.com/hashicorp/go-pgmultiauth
 ```
 
 
