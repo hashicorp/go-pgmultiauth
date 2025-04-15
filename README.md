@@ -1,10 +1,10 @@
-# go-pgmultiauth-beta
+# go-pgmultiauth
 
-pgmultiauth is a Go module that simplifies and streamlines authentication with PostgreSQL databases using multiple authentication methods. It provides a unified interface for connecting to PostgreSQL databases using various cloud authentication mechanisms.
+`pgmultiauth` is a Go module that simplifies and streamlines authentication with PostgreSQL databases using multiple authentication methods. It provides a unified interface for connecting to PostgreSQL databases using various authentication mechanisms.
 
 ## Features
 
-- **Multiple Authentication Methods**: Support for AWS IAM, GCP, and Azure authentication
+- **Multiple Authentication Methods**: Support for AWS, GCP, and Azure authentication.
 - **Connection Management**: Handles token refresh and reconnection logic automatically
 - **Multiple consumption mechanism**: Supports various handlers like *sql.DB, driver.Connector, *pgxpool.Pool etc
 
@@ -12,32 +12,30 @@ pgmultiauth is a Go module that simplifies and streamlines authentication with P
 
 The module currently supports:
 
-- **AWS IAM Authentication**: For RDS and Aurora PostgreSQL instances
+- **AWS  Authentication**: For RDS and Aurora PostgreSQL instances
 - **GCP Authentication**: For Cloud SQL PostgreSQL instances
 - **Azure Authentication**: For Azure Database for PostgreSQL
 
 ## Installation
 
 ```bash
-go get github.com/hashicorp/go-pgmultiauth-beta
+go get github.com/hashicorp/go-pgmultiauth
 ```
 
 
 ## Usage
 
-### Using with database/sql
+### Using with database/sql.DB
 
 ```go
 
 authConfig := pgmultiauth.AuthConfig{
     DatabaseURL:    "postgres://myuser@mydb.cluster-abc123.us-west-2.rds.amazonaws.com:5432/mydb",
     Logger:         logger,
-    UseAWSIAMAuth:  true,
-    AWSDBRegion:    "us-west-2",
+    AWSConfig:      awsConfig,
 }
 
-
-db, err := pgmultiauth.DBHandler(authConfig)
+db, err := pgmultiauth.Open(authConfig)
 if err != nil {
     // handle error
 }
@@ -49,7 +47,7 @@ defer db.Close()
 ### Using with pgx connection pool
 ```go
 ctx := context.Background()
-pool, err := pgmultiauth.DBPool(ctx, authConfig)
+pool, err := pgmultiauth.NewDBPool(ctx, authConfig)
 if err != nil {
     // handle error
 }
@@ -76,7 +74,7 @@ poolConfig := pgxpool.Config{
 ### Using driver.Connector
 
 ```go
-dbConnector, err := pgmultiauth.DBConnector(dbAuthConfig)
+dbConnector, err := pgmultiauth.GetConnector(dbAuthConfig)
 if err != nil {
     // handle error
 }

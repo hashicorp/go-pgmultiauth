@@ -25,7 +25,7 @@ type AuthMethod int
 
 const (
 	NoAuth    AuthMethod = iota // Default value, no authentication
-	AWSAuth                     // AWS IAM authentication
+	AWSAuth                     // AWS authentication
 	GCPAuth                     // GCP authentication
 	AzureAuth                   // Azure authentication
 )
@@ -38,7 +38,7 @@ type AuthConfig struct {
 	// Enum to specify the authentication method
 	AuthMethod AuthMethod
 
-	// AWS IAM Auth
+	// AWS Auth
 	// Required if AuthMethod is AWSAuth
 	AWSConfig *aws.Config
 
@@ -230,22 +230,6 @@ func GetConnectionURL(authConfig AuthConfig) (string, error) {
 	return tokenBasedURL, nil
 }
 
-// GetAuthMode returns the authentication method based on the provided flags.
-// It prioritizes AWS IAM authentication, followed by GCP and Azure authentication.
-// If none of the flags are set, it returns NoAuth.
-func GetAuthMode(useAWSAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMethod {
-	switch {
-	case useAWSAuth:
-		return AWSAuth
-	case useGCPAuth:
-		return GCPAuth
-	case useAzureAuth:
-		return AzureAuth
-	default:
-		return NoAuth
-	}
-}
-
 // getAuthTokenWithRetry attempts to fetch an authentication token
 // with retries in case of failure. It uses exponential backoff
 // for retrying the request.
@@ -325,9 +309,14 @@ func replaceDBPassword(connectionURL string, newPassword string) (string, error)
 		return "", fmt.Errorf("failed to parse connection URL: %w", err)
 	}
 
+	var username string
+	if u.User != nil {
+		username = u.User.Username()
+	}
+
 	dbURL := fmt.Sprintf("%s://%s:%s@%s%s",
 		u.Scheme,
-		url.QueryEscape(u.User.Username()),
+		url.QueryEscape(username),
 		url.QueryEscape(newPassword),
 		u.Host,
 		u.Path,

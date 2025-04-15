@@ -1,4 +1,4 @@
-module github.com/hashicorp/go-pgmultiauth-beta
+module github.com/hashicorp/go-pgmultiauth
 
 go 1.23.3
 

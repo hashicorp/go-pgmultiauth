@@ -29,7 +29,7 @@ func Test_AuthConfig_validate(t *testing.T) {
 			expectedErr: false,
 		},
 		{
-			name: "Valid config with AWS IAM auth",
+			name: "Valid config with AWS auth",
 			config: AuthConfig{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
@@ -50,16 +50,6 @@ func Test_AuthConfig_validate(t *testing.T) {
 		},
 		{
 			name: "Valid config with Azure auth",
-			config: AuthConfig{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AzureAuth,
-				AzureCreds:  &MockTokenCredential{},
-			},
-			expectedErr: false,
-		},
-		{
-			name: "Azure auth without client ID",
 			config: AuthConfig{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
@@ -99,7 +89,7 @@ func Test_AuthConfig_validate(t *testing.T) {
 			errContains: "AWSConfig is required when AuthMethod is AWSAuth",
 		},
 		{
-			name: "Azure auth without Azure Cr",
+			name: "Azure auth without AzureCreds",
 			config: AuthConfig{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
@@ -155,7 +145,7 @@ func Test_AuthConfig_authConfigured(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "AWS IAM authentication configured",
+			name: "AWS authentication configured",
 			config: AuthConfig{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
@@ -211,7 +201,7 @@ func Test_GetAuthMode(t *testing.T) {
 			want:         NoAuth,
 		},
 		{
-			name:         "AWS IAM auth only",
+			name:         "AWS auth only",
 			useAWSAuth:   true,
 			useGCPAuth:   false,
 			useAzureAuth: false,
