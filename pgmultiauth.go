@@ -237,22 +237,6 @@ func GetConnectionURL(authConfig AuthConfig) (string, error) {
 	return tokenBasedURL, nil
 }
 
-// GetAuthMode returns the authentication method based on the provided flags.
-// It prioritizes AWS IAM authentication, followed by GCP and Azure authentication.
-// If none of the flags are set, it returns NoAuth.
-func GetAuthMode(useAWSIAMAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMethod {
-	switch {
-	case useAWSIAMAuth:
-		return AWSIAMAuth
-	case useGCPAuth:
-		return GCPAuth
-	case useAzureAuth:
-		return AzureAuth
-	default:
-		return NoAuth
-	}
-}
-
 // getAuthTokenWithRetry attempts to fetch an authentication token
 // with retries in case of failure. It uses exponential backoff
 // for retrying the request.
