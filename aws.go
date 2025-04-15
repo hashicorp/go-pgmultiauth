@@ -15,8 +15,8 @@ type awsTokenConfig struct {
 	awsConfig *aws.Config
 }
 
-func getAWSAuthToken(config awsTokenConfig) (*authToken, error) {
-	token, err := fetchAWSAuthToken(config)
+func (c awsTokenConfig) generateToken() (*authToken, error) {
+	token, err := c.fetchAWSAuthToken()
 	if err != nil {
 		return nil, fmt.Errorf("fetching aws token: %v", err)
 	}
@@ -29,14 +29,14 @@ func getAWSAuthToken(config awsTokenConfig) (*authToken, error) {
 	return &authToken{token: token, valid: validFn}, nil
 }
 
-func fetchAWSAuthToken(config awsTokenConfig) (string, error) {
-	creds := config.awsConfig.Credentials
-	region := *config.awsConfig.Region
+func (c awsTokenConfig) fetchAWSAuthToken() (string, error) {
+	creds := c.awsConfig.Credentials
+	region := *c.awsConfig.Region
 
 	authToken, err := rdsutils.BuildAuthToken(
-		fmt.Sprintf("%s:%d", config.host, config.port),
+		fmt.Sprintf("%s:%d", c.host, c.port),
 		region,
-		config.user,
+		c.user,
 		creds,
 	)
 	if err != nil {

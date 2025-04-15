@@ -29,11 +29,11 @@ func Test_AuthConfig_validate(t *testing.T) {
 			expectedErr: false,
 		},
 		{
-			name: "Valid config with AWS IAM auth",
+			name: "Valid config with AWS auth",
 			config: AuthConfig{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
-				AuthMethod:  AWSIAMAuth,
+				AuthMethod:  AWSAuth,
 				AWSConfig:   &aws.Config{},
 			},
 			expectedErr: false,
@@ -83,10 +83,10 @@ func Test_AuthConfig_validate(t *testing.T) {
 			config: AuthConfig{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
-				AuthMethod:  AWSIAMAuth,
+				AuthMethod:  AWSAuth,
 			},
 			expectedErr: true,
-			errContains: "AWSConfig is required when AuthMethod is AWSIAMAuth",
+			errContains: "AWSConfig is required when AuthMethod is AWSAuth",
 		},
 		{
 			name: "Azure auth without AzureCreds",
@@ -145,11 +145,11 @@ func Test_AuthConfig_authConfigured(t *testing.T) {
 			expected: false,
 		},
 		{
-			name: "AWS IAM authentication configured",
+			name: "AWS authentication configured",
 			config: AuthConfig{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
-				AuthMethod:  AWSIAMAuth,
+				AuthMethod:  AWSAuth,
 				AWSConfig:   &aws.Config{},
 			},
 			expected: true,
@@ -187,73 +187,73 @@ func Test_AuthConfig_authConfigured(t *testing.T) {
 
 func Test_GetAuthMode(t *testing.T) {
 	tests := []struct {
-		name          string
-		useAWSIAMAuth bool
-		useGCPAuth    bool
-		useAzureAuth  bool
-		want          AuthMethod
+		name         string
+		useAWSAuth   bool
+		useGCPAuth   bool
+		useAzureAuth bool
+		want         AuthMethod
 	}{
 		{
-			name:          "No auth method specified",
-			useAWSIAMAuth: false,
-			useGCPAuth:    false,
-			useAzureAuth:  false,
-			want:          NoAuth,
+			name:         "No auth method specified",
+			useAWSAuth:   false,
+			useGCPAuth:   false,
+			useAzureAuth: false,
+			want:         NoAuth,
 		},
 		{
-			name:          "AWS IAM auth only",
-			useAWSIAMAuth: true,
-			useGCPAuth:    false,
-			useAzureAuth:  false,
-			want:          AWSIAMAuth,
+			name:         "AWS auth only",
+			useAWSAuth:   true,
+			useGCPAuth:   false,
+			useAzureAuth: false,
+			want:         AWSAuth,
 		},
 		{
-			name:          "GCP auth only",
-			useAWSIAMAuth: false,
-			useGCPAuth:    true,
-			useAzureAuth:  false,
-			want:          GCPAuth,
+			name:         "GCP auth only",
+			useAWSAuth:   false,
+			useGCPAuth:   true,
+			useAzureAuth: false,
+			want:         GCPAuth,
 		},
 		{
-			name:          "Azure auth only",
-			useAWSIAMAuth: false,
-			useGCPAuth:    false,
-			useAzureAuth:  true,
-			want:          AzureAuth,
+			name:         "Azure auth only",
+			useAWSAuth:   false,
+			useGCPAuth:   false,
+			useAzureAuth: true,
+			want:         AzureAuth,
 		},
 		{
-			name:          "AWS prioritized over GCP",
-			useAWSIAMAuth: true,
-			useGCPAuth:    true,
-			useAzureAuth:  false,
-			want:          AWSIAMAuth,
+			name:         "AWS prioritized over GCP",
+			useAWSAuth:   true,
+			useGCPAuth:   true,
+			useAzureAuth: false,
+			want:         AWSAuth,
 		},
 		{
-			name:          "AWS prioritized over Azure",
-			useAWSIAMAuth: true,
-			useGCPAuth:    false,
-			useAzureAuth:  true,
-			want:          AWSIAMAuth,
+			name:         "AWS prioritized over Azure",
+			useAWSAuth:   true,
+			useGCPAuth:   false,
+			useAzureAuth: true,
+			want:         AWSAuth,
 		},
 		{
-			name:          "GCP prioritized over Azure",
-			useAWSIAMAuth: false,
-			useGCPAuth:    true,
-			useAzureAuth:  true,
-			want:          GCPAuth,
+			name:         "GCP prioritized over Azure",
+			useAWSAuth:   false,
+			useGCPAuth:   true,
+			useAzureAuth: true,
+			want:         GCPAuth,
 		},
 		{
-			name:          "AWS prioritized over all others",
-			useAWSIAMAuth: true,
-			useGCPAuth:    true,
-			useAzureAuth:  true,
-			want:          AWSIAMAuth,
+			name:         "AWS prioritized over all others",
+			useAWSAuth:   true,
+			useGCPAuth:   true,
+			useAzureAuth: true,
+			want:         AWSAuth,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := GetAuthMode(tt.useAWSIAMAuth, tt.useGCPAuth, tt.useAzureAuth)
+			got := GetAuthMode(tt.useAWSAuth, tt.useGCPAuth, tt.useAzureAuth)
 			if got != tt.want {
 				t.Errorf("GetAuthMode() = %v, want %v", got, tt.want)
 			}
