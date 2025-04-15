@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/go-pgmultiauth-beta"
+	"github.com/hashicorp/go-pgmultiauth"
 	"golang.org/x/oauth2/google"
 )
 
@@ -45,7 +45,7 @@ func main() {
 	var azureCreds azcore.TokenCredential
 	var awsConfig *aws.Config
 
-	if authMethod == pgmultiauth.AWSIAMAuth {
+	if authMethod == pgmultiauth.AWSAuth {
 		// Get aws region from environment variable
 		awsRegion := os.Getenv("AWS_REGION")
 		if awsRegion == "" {
