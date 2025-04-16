@@ -2,21 +2,17 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"strconv"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
-	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/go-pgmultiauth"
-	"golang.org/x/oauth2/google"
 )
 
 func main() {
-	fmt.Println("Hello, World!")
+	fmt.Println("Hello, \n1 -- 2 --- 3. \nTesting startttt!!!!")
 
 	// Get database url from environment varibale
 	dbUrl := os.Getenv("DATABASE_URL")
@@ -41,68 +37,39 @@ func main() {
 
 	authMethod := pgmultiauth.AuthMethod(authMethodInt)
 
-	var googleCreds *google.Credentials
-	var azureCreds azcore.TokenCredential
-	var awsConfig *aws.Config
+	useAWSIAMAuth := authMethod == pgmultiauth.AWSAuth
+	useGCPAuth := authMethod == pgmultiauth.GCPAuth
+	useAzureAuth := authMethod == pgmultiauth.AzureAuth
 
-	if authMethod == pgmultiauth.AWSAuth {
-		// Get aws region from environment variable
-		awsRegion := os.Getenv("AWS_REGION")
-		if awsRegion == "" {
-			fmt.Println("AWS_REGION is not set")
-			return
-		}
+	authConfig, err := pgmultiauth.DefaultCloudAuthConfig(dbUrl, hclog.Default(), pgmultiauth.CloudAuthConfigOptions{
+		UseAWSIAM:   useAWSIAMAuth,
+		AWSDBRegion: os.Getenv("AWS_REGION"),
 
-		awsConfig := &aws.Config{
-			Region: aws.String(awsRegion),
-		}
+		UseGCPDefaultCredentials: useGCPAuth,
 
-		sess, err := session.NewSession(awsConfig)
-		if err != nil {
-			fmt.Println("failed to create AWS session: %w", err)
-			return
-		}
-		awsConfig.Credentials = sess.Config.Credentials
-	} else if authMethod == pgmultiauth.GCPAuth {
-		ctx := context.Background()
-		creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")
-		if err != nil {
-			fmt.Println("failed to get GCP credentials: %w", err)
-			return
-		}
-		googleCreds = creds
-	} else if authMethod == pgmultiauth.AzureAuth {
-		// Get Azure client id from environment variable
-		azureClientID := os.Getenv("AZURE_CLIENT_ID")
-
-		msiCredOpts := &azidentity.ManagedIdentityCredentialOptions{}
-		if azureClientID != "" {
-			msiCredOpts.ID = azidentity.ClientID(azureClientID)
-		}
-
-		msiCreds, err := azidentity.NewManagedIdentityCredential(msiCredOpts)
-		if err != nil {
-			fmt.Println("failed to create Azure managed identity credential: %w", err)
-			return
-		}
-
-		azureCreds = msiCreds
+		UseAzureMSI:   useAzureAuth,
+		AzureClientID: os.Getenv("AZURE_CLIENT_ID"),
+	})
+	if err != nil {
+		fmt.Println("failed to create auth config: %w", err)
+		return
 	}
 
-	authConfig := pgmultiauth.AuthConfig{
-		DatabaseURL: dbUrl,
-		Logger:      hclog.Default(),
-		AuthMethod:  authMethod,
-		AWSConfig:   awsConfig,
-		AzureCreds:  azureCreds,
-		GoogleCreds: googleCreds,
-	}
+	openTest(authConfig)
+	connectorTest(authConfig)
+	dbPoolTest(authConfig)
+	connectionURLTest(authConfig)
 
+	fmt.Println("Successfully connected to the database")
+}
+
+func openTest(authConfig pgmultiauth.Config) {
 	db, err := pgmultiauth.Open(authConfig)
 	if err != nil {
 		fmt.Println("failed to open database: %w", err)
 		return
 	}
+	defer db.Close()
 
 	err = db.Ping()
 	if err != nil {
@@ -110,14 +77,64 @@ func main() {
 		return
 	}
 
-	// run a query
-	const q = `SELECT true`
-	var res bool
-	err = db.QueryRowContext(context.Background(), q).Scan(&res)
+	fmt.Println("Successfully connected to the database using Open")
+}
+
+func connectorTest(authConfig pgmultiauth.Config) {
+	connector, err := pgmultiauth.GetConnector(authConfig)
 	if err != nil {
-		fmt.Println("explicit query: %w", err)
+		fmt.Println("failed to get connector: %w", err)
 		return
 	}
 
-	fmt.Println("Successfully connected to the database")
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		fmt.Println("pinging database: %w", err)
+		return
+	}
+
+	fmt.Println("Successfully connected to the database using connector")
+}
+
+func dbPoolTest(authConfig pgmultiauth.Config) {
+	ctx := context.Background()
+	pool, err := pgmultiauth.NewDBPool(ctx, authConfig)
+	if err != nil {
+		fmt.Println("failed to create pool: %w", err)
+		return
+	}
+	defer pool.Close()
+
+	err = pool.Ping(ctx)
+	if err != nil {
+		fmt.Println("pinging database: %w", err)
+		return
+	}
+
+	fmt.Println("Successfully connected to the database using pool")
+}
+
+func connectionURLTest(authConfig pgmultiauth.Config) {
+	connURL, err := pgmultiauth.GetConnectionURL(authConfig)
+	if err != nil {
+		fmt.Println("failed to get connection URL: %w", err)
+		return
+	}
+
+	db, err := sql.Open("pgx", connURL)
+	if err != nil {
+		fmt.Println("failed to open database: %w", err)
+		return
+	}
+	defer db.Close()
+	err = db.Ping()
+	if err != nil {
+		fmt.Println("pinging database: %w", err)
+		return
+	}
+
+	fmt.Println("Successfully connected to the database using connection URL")
 }
