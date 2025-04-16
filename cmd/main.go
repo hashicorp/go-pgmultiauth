@@ -51,7 +51,7 @@ func main() {
 		AzureClientID: os.Getenv("AZURE_CLIENT_ID"),
 	})
 	if err != nil {
-		fmt.Println("failed to create auth config: %w", err)
+		fmt.Println("failed to create auth config:", err)
 		return
 	}
 
@@ -59,8 +59,6 @@ func main() {
 	connectorTest(authConfig)
 	dbPoolTest(authConfig)
 	connectionURLTest(authConfig)
-
-	fmt.Println("Successfully connected to the database")
 }
 
 func openTest(authConfig pgmultiauth.Config) {
