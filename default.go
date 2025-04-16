@@ -12,9 +12,9 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-// CloudAuthConfigOptions holds the configuration options for cloud authentication
-// when application is running in a cloud environment.
-type CloudAuthConfigOptions struct {
+// DefaultAuthConfigOptions holds the configuration options for various authentication
+// methods.
+type DefaultAuthConfigOptions struct {
 	UseAWSIAM                bool
 	UseGCPDefaultCredentials bool
 	UseAzureMSI              bool
@@ -26,13 +26,13 @@ type CloudAuthConfigOptions struct {
 	AzureClientID string
 }
 
-// DefaultCloudAuthConfig initializes Config with default behavior across the clouds. It assumes that application
-// is running in a cloud environment and uses the appropriate authentication method based on the provided options.
+// DefaultConfig initializes Config with default behavior across the auth methods.
+// For Cloud based auth it assumes that application is running in the cloud environment.
 // For AWS, it uses AWS IAM authentication
 // For GCP, it uses GCP default credentials
 // For Azure, it uses Managed Identity (MSI) authentication
 // For StandardAuth, it uses the default PostgreSQL authentication
-func DefaultCloudAuthConfig(dbURL string, logger hclog.Logger, opts CloudAuthConfigOptions) (Config, error) {
+func DefaultConfig(dbURL string, logger hclog.Logger, opts DefaultAuthConfigOptions) (Config, error) {
 	authMode := GetAuthMode(opts.UseAWSIAM, opts.UseGCPDefaultCredentials, opts.UseAzureMSI)
 
 	var googleCreds *google.Credentials
