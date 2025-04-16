@@ -41,7 +41,7 @@ func main() {
 	useGCPAuth := authMethod == pgmultiauth.GCPAuth
 	useAzureAuth := authMethod == pgmultiauth.AzureAuth
 
-	authConfig, err := pgmultiauth.DefaultCloudAuthConfig(dbUrl, hclog.Default(), pgmultiauth.CloudAuthConfigOptions{
+	authConfig, err := pgmultiauth.DefaultConfig(dbUrl, hclog.Default(), pgmultiauth.DefaultAuthConfigOptions{
 		UseAWSIAM:   useAWSIAMAuth,
 		AWSDBRegion: os.Getenv("AWS_REGION"),
 
