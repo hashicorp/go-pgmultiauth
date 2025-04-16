@@ -9,28 +9,28 @@ import (
 	"golang.org/x/oauth2/google"
 )
 
-func Test_AuthConfig_validate(t *testing.T) {
+func Test_Config_validate(t *testing.T) {
 	// Create a logger for tests
 	logger := hclog.NewNullLogger()
 
 	tests := []struct {
 		name        string
-		config      AuthConfig
+		config      Config
 		expectedErr bool
 		errContains string
 	}{
 		{
 			name: "Valid config with no auth",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
-				AuthMethod:  NoAuth,
+				AuthMethod:  StandardAuth,
 			},
 			expectedErr: false,
 		},
 		{
 			name: "Valid config with AWS auth",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  AWSAuth,
@@ -40,7 +40,7 @@ func Test_AuthConfig_validate(t *testing.T) {
 		},
 		{
 			name: "Valid config with GCP auth",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  GCPAuth,
@@ -50,7 +50,7 @@ func Test_AuthConfig_validate(t *testing.T) {
 		},
 		{
 			name: "Valid config with Azure auth",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  AzureAuth,
@@ -60,27 +60,27 @@ func Test_AuthConfig_validate(t *testing.T) {
 		},
 		{
 			name: "Empty DatabaseURL",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "",
 				Logger:      logger,
-				AuthMethod:  NoAuth,
+				AuthMethod:  StandardAuth,
 			},
 			expectedErr: true,
 			errContains: "databaseURL cannot be empty",
 		},
 		{
 			name: "Nil Logger",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      nil,
-				AuthMethod:  NoAuth,
+				AuthMethod:  StandardAuth,
 			},
 			expectedErr: true,
 			errContains: "logger cannot be nil",
 		},
 		{
 			name: "AWS auth without aws config",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  AWSAuth,
@@ -90,7 +90,7 @@ func Test_AuthConfig_validate(t *testing.T) {
 		},
 		{
 			name: "Azure auth without AzureCreds",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  AzureAuth,
@@ -100,7 +100,7 @@ func Test_AuthConfig_validate(t *testing.T) {
 		},
 		{
 			name: "Unsupported auth method",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  AuthMethod(99), // Invalid value
@@ -127,26 +127,26 @@ func Test_AuthConfig_validate(t *testing.T) {
 	}
 }
 
-func Test_AuthConfig_authConfigured(t *testing.T) {
+func Test_Config_authConfigured(t *testing.T) {
 	logger := hclog.NewNullLogger()
 
 	tests := []struct {
 		name     string
-		config   AuthConfig
+		config   Config
 		expected bool
 	}{
 		{
 			name: "No authentication configured",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
-				AuthMethod:  NoAuth,
+				AuthMethod:  StandardAuth,
 			},
 			expected: false,
 		},
 		{
 			name: "AWS authentication configured",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  AWSAuth,
@@ -156,7 +156,7 @@ func Test_AuthConfig_authConfigured(t *testing.T) {
 		},
 		{
 			name: "GCP authentication configured",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  GCPAuth,
@@ -165,7 +165,7 @@ func Test_AuthConfig_authConfigured(t *testing.T) {
 		},
 		{
 			name: "Azure authentication configured",
-			config: AuthConfig{
+			config: Config{
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  AzureAuth,
@@ -198,7 +198,7 @@ func Test_GetAuthMode(t *testing.T) {
 			useAWSAuth:   false,
 			useGCPAuth:   false,
 			useAzureAuth: false,
-			want:         NoAuth,
+			want:         StandardAuth,
 		},
 		{
 			name:         "AWS auth only",
