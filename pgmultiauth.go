@@ -24,14 +24,14 @@ import (
 type AuthMethod int
 
 const (
-	NoAuth    AuthMethod = iota // Default value, no authentication
-	AWSAuth                     // AWS authentication
-	GCPAuth                     // GCP authentication
-	AzureAuth                   // Azure authentication
+	StandardAuth AuthMethod = iota // Default value, standard authentication
+	AWSAuth                        // AWS authentication
+	GCPAuth                        // GCP authentication
+	AzureAuth                      // Azure authentication
 )
 
-// AuthConfig holds the configuration for database authentication.
-type AuthConfig struct {
+// Config holds the configuration for the database.
+type Config struct {
 	DatabaseURL string
 	Logger      hclog.Logger
 
@@ -49,58 +49,58 @@ type AuthConfig struct {
 	GoogleCreds *google.Credentials
 }
 
-// validate checks if the AuthConfig has all required fields
+// validate checks if the Config has all required fields
 // and returns an error if validation fails.
-func (ac AuthConfig) validate() error {
-	if ac.DatabaseURL == "" {
+func (c Config) validate() error {
+	if c.DatabaseURL == "" {
 		return fmt.Errorf("databaseURL cannot be empty")
 	}
 
-	if ac.Logger == nil {
+	if c.Logger == nil {
 		return fmt.Errorf("logger cannot be nil")
 	}
 
 	// Validate auth-specific configurations
-	switch ac.AuthMethod {
-	case NoAuth:
-		// No additional validation needed for NoAuth
+	switch c.AuthMethod {
+	case StandardAuth:
+		// No additional validation needed for StandardAuth
 	case AWSAuth:
-		if ac.AWSConfig == nil {
+		if c.AWSConfig == nil {
 			return fmt.Errorf("AWSConfig is required when AuthMethod is AWSAuth")
 		}
 	case AzureAuth:
-		if ac.AzureCreds == nil {
+		if c.AzureCreds == nil {
 			return fmt.Errorf("AzureCreds is required when AuthMethod is AzureAuth")
 		}
 	case GCPAuth:
-		if ac.GoogleCreds == nil {
+		if c.GoogleCreds == nil {
 			return fmt.Errorf("GoogleCreds is required when AuthMethod is GCPAuth")
 		}
 	default:
-		return fmt.Errorf("unsupported authentication method: %d", ac.AuthMethod)
+		return fmt.Errorf("unsupported authentication method: %d", c.AuthMethod)
 	}
 
 	return nil
 }
 
 // authConfigured checks if any authentication method is configured
-func (ac AuthConfig) authConfigured() bool {
-	return ac.AuthMethod != NoAuth
+func (c Config) authConfigured() bool {
+	return c.AuthMethod != StandardAuth
 }
 
 // Open initializes and returns a *sql.DB database connection
 // using the provided authentication configuration.
-func Open(authConfig AuthConfig) (*sql.DB, error) {
-	if err := authConfig.validate(); err != nil {
+func Open(config Config) (*sql.DB, error) {
+	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
 
-	connConfig, err := pgx.ParseConfig(authConfig.DatabaseURL)
+	connConfig, err := pgx.ParseConfig(config.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database connection string: %v", err)
 	}
 
-	beforeConnect, err := BeforeConnectFn(authConfig)
+	beforeConnect, err := BeforeConnectFn(config)
 	if err != nil {
 		return nil, fmt.Errorf("generating before connect function: %v", err)
 	}
@@ -111,17 +111,17 @@ func Open(authConfig AuthConfig) (*sql.DB, error) {
 
 // GetConnector initializes and returns a driver.Connector
 // using the provided authentication configuration.
-func GetConnector(authConfig AuthConfig) (driver.Connector, error) {
-	if err := authConfig.validate(); err != nil {
+func GetConnector(config Config) (driver.Connector, error) {
+	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
 
-	connConfig, err := pgx.ParseConfig(authConfig.DatabaseURL)
+	connConfig, err := pgx.ParseConfig(config.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database connection string: %v", err)
 	}
 
-	beforeConnect, err := BeforeConnectFn(authConfig)
+	beforeConnect, err := BeforeConnectFn(config)
 	if err != nil {
 		return nil, fmt.Errorf("generating before connect function: %v", err)
 	}
@@ -131,17 +131,17 @@ func GetConnector(authConfig AuthConfig) (driver.Connector, error) {
 
 // NewDBPool initializes and returns a *pgxpool.Pool database connection
 // using the provided authentication configuration.
-func NewDBPool(ctx context.Context, authConfig AuthConfig) (*pgxpool.Pool, error) {
-	if err := authConfig.validate(); err != nil {
+func NewDBPool(ctx context.Context, config Config) (*pgxpool.Pool, error) {
+	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
 
-	connConfig, err := pgxpool.ParseConfig(authConfig.DatabaseURL)
+	connConfig, err := pgxpool.ParseConfig(config.DatabaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database connection string: %v", err)
 	}
 
-	beforeConnect, err := BeforeConnectFn(authConfig)
+	beforeConnect, err := BeforeConnectFn(config)
 	if err != nil {
 		return nil, fmt.Errorf("generating before connect function: %v", err)
 	}
@@ -158,27 +158,27 @@ func NewDBPool(ctx context.Context, authConfig AuthConfig) (*pgxpool.Pool, error
 
 // BeforeConnectFn returns a function that can be used to set up the
 // authentication before establishing a connection to the database.
-func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConfig) error, error) {
-	if err := authConfig.validate(); err != nil {
+func BeforeConnectFn(config Config) (func(context.Context, *pgx.ConnConfig) error, error) {
+	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("invalid authentication configuration: %v", err)
 	}
 
 	// noop before connect by default
 	beforeConnect := func(context.Context, *pgx.ConnConfig) error { return nil }
 
-	if authConfig.authConfigured() {
-		authConfig.Logger.Info("getting initial db auth token")
-		token, err := getAuthTokenWithRetry(authConfig)
+	if config.authConfigured() {
+		config.Logger.Info("getting initial db auth token")
+		token, err := getAuthTokenWithRetry(config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get initial db token: %v", err)
 		}
 
 		var tokenMutex sync.Mutex
 
-		beforeConnect = func(ctx context.Context, config *pgx.ConnConfig) error {
+		beforeConnect = func(ctx context.Context, connConfig *pgx.ConnConfig) error {
 			// no point in contending for lock if we know the token is valid
 			if token.valid() {
-				config.Password = token.token
+				connConfig.Password = token.token
 				return nil
 			}
 
@@ -189,14 +189,14 @@ func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConf
 			// necessary because multiple connections in the pool might be waiting to acquire tokenMutex after finding the token invalid
 			// and the token might have been refreshed by a connection that acquired the lock first
 			if !token.valid() {
-				authConfig.Logger.Info("refreshing db token")
-				token, err = getAuthTokenWithRetry(authConfig)
+				config.Logger.Info("refreshing db token")
+				token, err = getAuthTokenWithRetry(config)
 				if err != nil {
 					return fmt.Errorf("failed to get db token: %v", err)
 				}
 			}
 
-			config.Password = token.token
+			connConfig.Password = token.token
 			return nil
 		}
 	}
@@ -206,23 +206,23 @@ func BeforeConnectFn(authConfig AuthConfig) (func(context.Context, *pgx.ConnConf
 
 // GetConnectionURL returns the database connection URL based on the provided
 // authentication configuration.
-func GetConnectionURL(authConfig AuthConfig) (string, error) {
-	if err := authConfig.validate(); err != nil {
+func GetConnectionURL(config Config) (string, error) {
+	if err := config.validate(); err != nil {
 		return "", fmt.Errorf("invalid authentication configuration: %v", err)
 	}
 
-	if !authConfig.authConfigured() {
-		return authConfig.DatabaseURL, nil
+	if !config.authConfigured() {
+		return config.DatabaseURL, nil
 	}
 
-	token, err := getAuthTokenWithRetry(authConfig)
+	token, err := getAuthTokenWithRetry(config)
 	if err != nil {
 		return "", fmt.Errorf("fetching auth token: %v", err)
 	}
 
-	authConfig.Logger.Info("db auth token fetched")
+	config.Logger.Info("db auth token fetched")
 
-	tokenBasedURL, err := replaceDBPassword(authConfig.DatabaseURL, token.token)
+	tokenBasedURL, err := replaceDBPassword(config.DatabaseURL, token.token)
 	if err != nil {
 		return "", fmt.Errorf("preparing database connection url with auth token: %v", err)
 	}
@@ -233,20 +233,20 @@ func GetConnectionURL(authConfig AuthConfig) (string, error) {
 // getAuthTokenWithRetry attempts to fetch an authentication token
 // with retries in case of failure. It uses exponential backoff
 // for retrying the request.
-func getAuthTokenWithRetry(authConfig AuthConfig) (*authToken, error) {
+func getAuthTokenWithRetry(config Config) (*authToken, error) {
 	var token *authToken
 	var err error
 
 	err = retry.Do(
 		func() error {
-			token, err = getAuthToken(authConfig)
+			token, err = getAuthToken(config)
 			return err
 		},
 		retry.Attempts(3),
 		retry.Delay(50*time.Millisecond),
 		retry.DelayType(retry.BackOffDelay),
 		retry.OnRetry(func(n uint, err error) {
-			authConfig.Logger.Error("failed to fetch auth token", "attempt", n, "error", err)
+			config.Logger.Error("failed to fetch auth token", "attempt", n, "error", err)
 		}),
 	)
 	if err != nil {
@@ -270,12 +270,12 @@ type tokenGenerator interface {
 
 // getAuthToken returns an authentication token for the database connection
 // based on the provided authentication configuration.
-func getAuthToken(authConfig AuthConfig) (*authToken, error) {
+func getAuthToken(config Config) (*authToken, error) {
 	var tokenGenerator tokenGenerator
 
 	switch {
-	case authConfig.AuthMethod == AWSAuth:
-		connConfig, err := pgx.ParseConfig(authConfig.DatabaseURL)
+	case config.AuthMethod == AWSAuth:
+		connConfig, err := pgx.ParseConfig(config.DatabaseURL)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse connection string: %v", err)
 		}
@@ -284,18 +284,18 @@ func getAuthToken(authConfig AuthConfig) (*authToken, error) {
 			host:      connConfig.Host,
 			port:      connConfig.Port,
 			user:      connConfig.User,
-			awsConfig: authConfig.AWSConfig,
+			awsConfig: config.AWSConfig,
 		}
-	case authConfig.AuthMethod == GCPAuth:
+	case config.AuthMethod == GCPAuth:
 		tokenGenerator = gcpTokenConfig{
-			creds: authConfig.GoogleCreds,
+			creds: config.GoogleCreds,
 		}
-	case authConfig.AuthMethod == AzureAuth:
+	case config.AuthMethod == AzureAuth:
 		tokenGenerator = azureTokenConfig{
-			creds: authConfig.AzureCreds,
+			creds: config.AzureCreds,
 		}
 	default:
-		return nil, fmt.Errorf("unsupported authentication method: %d", authConfig.AuthMethod)
+		return nil, fmt.Errorf("unsupported authentication method: %d", config.AuthMethod)
 	}
 
 	return tokenGenerator.generateToken()

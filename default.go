@@ -26,13 +26,13 @@ type CloudAuthConfigOptions struct {
 	AzureClientID string
 }
 
-// DefaultCloudAuthConfig initializes AuthConfig with default behavior across the clouds. It assumes that application
+// DefaultCloudAuthConfig initializes Config with default behavior across the clouds. It assumes that application
 // is running in a cloud environment and uses the appropriate authentication method based on the provided options.
 // For AWS, it uses AWS IAM authentication
 // For GCP, it uses GCP default credentials
 // For Azure, it uses Managed Identity (MSI) authentication
-// For NoAuth, it uses the default PostgreSQL authentication
-func DefaultCloudAuthConfig(dbURL string, logger hclog.Logger, opts CloudAuthConfigOptions) (AuthConfig, error) {
+// For StandardAuth, it uses the default PostgreSQL authentication
+func DefaultCloudAuthConfig(dbURL string, logger hclog.Logger, opts CloudAuthConfigOptions) (Config, error) {
 	authMode := GetAuthMode(opts.UseAWSIAM, opts.UseGCPDefaultCredentials, opts.UseAzureMSI)
 
 	var googleCreds *google.Credentials
@@ -41,14 +41,14 @@ func DefaultCloudAuthConfig(dbURL string, logger hclog.Logger, opts CloudAuthCon
 
 	if authMode == AWSAuth {
 		if opts.AWSDBRegion == "" {
-			return AuthConfig{}, fmt.Errorf("AWSDBRegion is required for AWS IAM authentication")
+			return Config{}, fmt.Errorf("AWSDBRegion is required for AWS IAM authentication")
 		}
 
 		sess, err := session.NewSession(&aws.Config{
 			Region: aws.String(opts.AWSDBRegion),
 		})
 		if err != nil {
-			return AuthConfig{}, fmt.Errorf("failed to create AWS session: %v", err)
+			return Config{}, fmt.Errorf("failed to create AWS session: %v", err)
 		}
 
 		awsConfig = sess.Config
@@ -56,7 +56,7 @@ func DefaultCloudAuthConfig(dbURL string, logger hclog.Logger, opts CloudAuthCon
 		ctx := context.Background()
 		creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")
 		if err != nil {
-			return AuthConfig{}, fmt.Errorf("failed to get GCP credentials: %v", err)
+			return Config{}, fmt.Errorf("failed to get GCP credentials: %v", err)
 		}
 		googleCreds = creds
 	} else if authMode == AzureAuth {
@@ -67,13 +67,13 @@ func DefaultCloudAuthConfig(dbURL string, logger hclog.Logger, opts CloudAuthCon
 
 		msiCreds, err := azidentity.NewManagedIdentityCredential(msiCredOpts)
 		if err != nil {
-			return AuthConfig{}, fmt.Errorf("failed to create Azure managed identity credential: %v", err)
+			return Config{}, fmt.Errorf("failed to create Azure managed identity credential: %v", err)
 		}
 
 		azureCreds = msiCreds
 	}
 
-	return AuthConfig{
+	return Config{
 		DatabaseURL: dbURL,
 		Logger:      logger,
 		AuthMethod:  authMode,
@@ -85,7 +85,7 @@ func DefaultCloudAuthConfig(dbURL string, logger hclog.Logger, opts CloudAuthCon
 
 // GetAuthMode returns the authentication method based on the provided flags.
 // It prioritizes AWS IAM authentication, followed by GCP and Azure authentication.
-// If none of the flags are set, it returns NoAuth.
+// If none of the flags are set, it returns StandardAuth.
 func GetAuthMode(useAWSIAMAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMethod {
 	switch {
 	case useAWSIAMAuth:
@@ -95,6 +95,6 @@ func GetAuthMode(useAWSIAMAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMet
 	case useAzureAuth:
 		return AzureAuth
 	default:
-		return NoAuth
+		return StandardAuth
 	}
 }
