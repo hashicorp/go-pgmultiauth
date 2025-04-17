@@ -40,6 +40,7 @@ type Config struct {
 
 	// AWS Auth
 	// Required if AuthMethod is AWSAuth
+	// Region and Credentials must be set in AWSConfig
 	AWSConfig *aws.Config
 
 	// Azure Auth
@@ -67,6 +68,12 @@ func (c Config) validate() error {
 	case AWSAuth:
 		if c.AWSConfig == nil {
 			return fmt.Errorf("AWSConfig is required when AuthMethod is AWSAuth")
+		}
+		if c.AWSConfig.Region == nil {
+			return fmt.Errorf("region is required in AWSConfig when AuthMethod is AWSAuth")
+		}
+		if c.AWSConfig.Credentials == nil {
+			return fmt.Errorf("credentials are required in AWSConfig when AuthMethod is AWSAuth")
 		}
 	case AzureAuth:
 		if c.AzureCreds == nil {
