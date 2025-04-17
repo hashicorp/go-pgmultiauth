@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2/google"
@@ -34,7 +35,10 @@ func Test_Config_validate(t *testing.T) {
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  AWSAuth,
-				AWSConfig:   &aws.Config{},
+				AWSConfig: &aws.Config{
+					Region:      aws.String("us-west-2"),
+					Credentials: credentials.AnonymousCredentials,
+				},
 			},
 			expectedErr: false,
 		},
@@ -87,6 +91,32 @@ func Test_Config_validate(t *testing.T) {
 			},
 			expectedErr: true,
 			errContains: "AWSConfig is required when AuthMethod is AWSAuth",
+		},
+		{
+			name: "AWS auth without region in aws config",
+			config: Config{
+				DatabaseURL: "postgres://user@host:5432/db",
+				Logger:      logger,
+				AuthMethod:  AWSAuth,
+				AWSConfig: &aws.Config{
+					Credentials: credentials.AnonymousCredentials,
+				},
+			},
+			expectedErr: true,
+			errContains: "region is required in AWSConfig when AuthMethod is AWSAuth",
+		},
+		{
+			name: "AWS auth without credentials in aws config",
+			config: Config{
+				DatabaseURL: "postgres://user@host:5432/db",
+				Logger:      logger,
+				AuthMethod:  AWSAuth,
+				AWSConfig: &aws.Config{
+					Region: aws.String("us-west-2"),
+				},
+			},
+			expectedErr: true,
+			errContains: "credentials are required in AWSConfig when AuthMethod is AWSAuth",
 		},
 		{
 			name: "Azure auth without AzureCreds",
