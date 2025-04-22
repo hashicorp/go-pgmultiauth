@@ -40,6 +40,7 @@ type Config struct {
 
 	// AWS Auth
 	// Required if AuthMethod is AWSAuth
+	// Region and Credentials must be set in AWSConfig
 	AWSConfig *aws.Config
 
 	// Azure Auth
@@ -67,16 +68,16 @@ func (c Config) validate() error {
 	case StandardAuth:
 		// No additional validation needed for StandardAuth
 	case AWSAuth:
-		if c.AWSConfig == nil {
-			return fmt.Errorf("AWSConfig is required when AuthMethod is AWSAuth")
+		if err := validateAWSConfig(c.AWSConfig); err != nil {
+			return fmt.Errorf("invalid AWS config: %v", err)
 		}
 	case AzureAuth:
-		if c.AzureCreds == nil {
-			return fmt.Errorf("AzureCreds is required when AuthMethod is AzureAuth")
+		if err := validateAzureConfig(c.AzureCreds); err != nil {
+			return fmt.Errorf("invalid Azure config: %v", err)
 		}
 	case GCPAuth:
-		if c.GoogleCreds == nil {
-			return fmt.Errorf("GoogleCreds is required when AuthMethod is GCPAuth")
+		if err := validateGCPConfig(c.GoogleCreds); err != nil {
+			return fmt.Errorf("invalid GCP config: %v", err)
 		}
 	default:
 		return fmt.Errorf("unsupported authentication method: %d", c.AuthMethod)
