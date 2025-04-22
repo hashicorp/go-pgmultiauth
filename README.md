@@ -35,7 +35,7 @@ authConfig := pgmultiauth.Config{
     AWSConfig:      awsConfig,
 }
 
-db, err := pgmultiauth.Open(authConfig)
+db, err := pgmultiauth.Open(ctx, authConfig)
 if err != nil {
     // handle error
 }
@@ -46,7 +46,6 @@ defer db.Close()
 
 ### Using with pgx connection pool
 ```go
-ctx := context.Background()
 pool, err := pgmultiauth.NewDBPool(ctx, authConfig)
 if err != nil {
     // handle error
@@ -58,7 +57,7 @@ defer pool.Close()
 
 ### Using BeforeConnect function of pgxpool.Config
 ```go
-beforeConnect, err := pgmultiauth.BeforeConnectFn(authConfig)
+beforeConnect, err := pgmultiauth.BeforeConnectFn(ctx, authConfig)
 if err != nil {
     // handle error
 }
@@ -74,7 +73,7 @@ poolConfig := pgxpool.Config{
 ### Using driver.Connector
 
 ```go
-dbConnector, err := pgmultiauth.GetConnector(dbAuthConfig)
+dbConnector, err := pgmultiauth.GetConnector(ctx, dbAuthConfig)
 if err != nil {
     // handle error
 }

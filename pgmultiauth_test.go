@@ -3,8 +3,8 @@ package pgmultiauth
 import (
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go-v2/aws"
+
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/oauth2"
@@ -37,8 +37,8 @@ func Test_Config_validate(t *testing.T) {
 				Logger:      logger,
 				AuthMethod:  AWSAuth,
 				AWSConfig: &aws.Config{
-					Region:      aws.String("us-west-2"),
-					Credentials: credentials.AnonymousCredentials,
+					Region:      "us-west-2",
+					Credentials: aws.AnonymousCredentials{},
 				},
 			},
 			expectedErr: false,
@@ -102,7 +102,7 @@ func Test_Config_validate(t *testing.T) {
 				Logger:      logger,
 				AuthMethod:  AWSAuth,
 				AWSConfig: &aws.Config{
-					Credentials: credentials.AnonymousCredentials,
+					Credentials: aws.AnonymousCredentials{},
 				},
 			},
 			expectedErr: true,
@@ -115,7 +115,7 @@ func Test_Config_validate(t *testing.T) {
 				Logger:      logger,
 				AuthMethod:  AWSAuth,
 				AWSConfig: &aws.Config{
-					Region: aws.String("us-west-2"),
+					Region: "us-west-2",
 				},
 			},
 			expectedErr: true,

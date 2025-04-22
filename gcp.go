@@ -1,6 +1,7 @@
 package pgmultiauth
 
 import (
+	"context"
 	"fmt"
 
 	"golang.org/x/oauth2"
@@ -11,7 +12,7 @@ type gcpTokenConfig struct {
 	creds *google.Credentials
 }
 
-func (c gcpTokenConfig) generateToken() (*authToken, error) {
+func (c gcpTokenConfig) generateToken(ctx context.Context) (*authToken, error) {
 	token, err := c.fetchGCPAuthToken()
 	if err != nil {
 		return nil, fmt.Errorf("fetching gcp token: %v", err)

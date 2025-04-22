@@ -1,11 +1,12 @@
 package pgmultiauth
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/rds/rdsutils"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 )
 
 type awsTokenConfig struct {
@@ -15,8 +16,8 @@ type awsTokenConfig struct {
 	awsConfig *aws.Config
 }
 
-func (c awsTokenConfig) generateToken() (*authToken, error) {
-	token, err := c.fetchAWSAuthToken()
+func (c awsTokenConfig) generateToken(ctx context.Context) (*authToken, error) {
+	token, err := c.fetchAWSAuthToken(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetching aws token: %v", err)
 	}
@@ -29,11 +30,11 @@ func (c awsTokenConfig) generateToken() (*authToken, error) {
 	return &authToken{token: token, valid: validFn}, nil
 }
 
-func (c awsTokenConfig) fetchAWSAuthToken() (string, error) {
+func (c awsTokenConfig) fetchAWSAuthToken(ctx context.Context) (string, error) {
 	creds := c.awsConfig.Credentials
-	region := *c.awsConfig.Region
+	region := c.awsConfig.Region
 
-	authToken, err := rdsutils.BuildAuthToken(
+	authToken, err := auth.BuildAuthToken(ctx,
 		fmt.Sprintf("%s:%d", c.host, c.port),
 		region,
 		c.user,
@@ -51,7 +52,7 @@ func validateAWSConfig(awsConfig *aws.Config) error {
 		return fmt.Errorf("aws config is required for AWS authentication")
 	}
 
-	if awsConfig.Region == nil {
+	if awsConfig.Region == "" {
 		return fmt.Errorf("aws region is required for AWS authentication")
 	}
 

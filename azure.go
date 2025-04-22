@@ -13,8 +13,8 @@ type azureTokenConfig struct {
 	creds azcore.TokenCredential
 }
 
-func (c azureTokenConfig) generateToken() (*authToken, error) {
-	token, err := c.fetchAzureAuthToken()
+func (c azureTokenConfig) generateToken(ctx context.Context) (*authToken, error) {
+	token, err := c.fetchAzureAuthToken(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("fetching azure token: %v", err)
 	}
@@ -26,8 +26,7 @@ func (c azureTokenConfig) generateToken() (*authToken, error) {
 	return &authToken{token: token.Token, valid: validFn}, nil
 }
 
-func (c azureTokenConfig) fetchAzureAuthToken() (azcore.AccessToken, error) {
-	ctx := context.Background()
+func (c azureTokenConfig) fetchAzureAuthToken(ctx context.Context) (azcore.AccessToken, error) {
 	token, err := c.creds.GetToken(ctx, policy.TokenRequestOptions{
 		Scopes: []string{"https://ossrdbms-aad.database.windows.net/.default"},
 	})

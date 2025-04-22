@@ -6,8 +6,8 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/hashicorp/go-hclog"
 	"golang.org/x/oauth2/google"
 )
@@ -32,7 +32,7 @@ type DefaultAuthConfigOptions struct {
 // For GCP, it uses GCP default credentials
 // For Azure, it uses Managed Identity (MSI) authentication
 // For StandardAuth, it uses the default PostgreSQL authentication
-func DefaultConfig(dbURL string, logger hclog.Logger, opts DefaultAuthConfigOptions) (Config, error) {
+func DefaultConfig(ctx context.Context, dbURL string, logger hclog.Logger, opts DefaultAuthConfigOptions) (Config, error) {
 	authMode := GetAuthMode(opts.UseAWSIAM, opts.UseGCPDefaultCredentials, opts.UseAzureMSI)
 
 	var googleCreds *google.Credentials
@@ -44,16 +44,13 @@ func DefaultConfig(dbURL string, logger hclog.Logger, opts DefaultAuthConfigOpti
 			return Config{}, fmt.Errorf("AWSDBRegion is required for AWS IAM authentication")
 		}
 
-		sess, err := session.NewSession(&aws.Config{
-			Region: aws.String(opts.AWSDBRegion),
-		})
+		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(opts.AWSDBRegion))
 		if err != nil {
-			return Config{}, fmt.Errorf("failed to create AWS session: %v", err)
+			return Config{}, fmt.Errorf("failed to load AWS config: %v", err)
 		}
 
-		awsConfig = sess.Config
+		awsConfig = &cfg
 	} else if authMode == GCPAuth {
-		ctx := context.Background()
 		creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to get GCP credentials: %v", err)
