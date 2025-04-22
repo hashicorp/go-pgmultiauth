@@ -46,3 +46,19 @@ func (c awsTokenConfig) fetchAWSAuthToken(ctx context.Context) (string, error) {
 
 	return authToken, nil
 }
+
+func validateAWSConfig(awsConfig *aws.Config) error {
+	if awsConfig == nil {
+		return fmt.Errorf("aws config is required for AWS authentication")
+	}
+
+	if awsConfig.Region == nil {
+		return fmt.Errorf("aws region is required for AWS authentication")
+	}
+
+	if awsConfig.Credentials == nil {
+		return fmt.Errorf("aws credentials are required for AWS authentication")
+	}
+
+	return nil
+}

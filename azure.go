@@ -36,3 +36,11 @@ func (c azureTokenConfig) fetchAzureAuthToken(ctx context.Context) (azcore.Acces
 
 	return token, nil
 }
+
+func validateAzureConfig(creds azcore.TokenCredential) error {
+	if creds == nil {
+		return fmt.Errorf("azure credentials are required for Azure authentication")
+	}
+
+	return nil
+}

@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
 
@@ -48,7 +49,9 @@ func Test_Config_validate(t *testing.T) {
 				DatabaseURL: "postgres://user@host:5432/db",
 				Logger:      logger,
 				AuthMethod:  GCPAuth,
-				GoogleCreds: &google.Credentials{},
+				GoogleCreds: &google.Credentials{
+					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{}),
+				},
 			},
 			expectedErr: false,
 		},
@@ -90,7 +93,7 @@ func Test_Config_validate(t *testing.T) {
 				AuthMethod:  AWSAuth,
 			},
 			expectedErr: true,
-			errContains: "AWSConfig is required when AuthMethod is AWSAuth",
+			errContains: "invalid AWS config: aws config is required for AWS authentication",
 		},
 		{
 			name: "AWS auth without region in aws config",
@@ -103,7 +106,7 @@ func Test_Config_validate(t *testing.T) {
 				},
 			},
 			expectedErr: true,
-			errContains: "region is required in AWSConfig when AuthMethod is AWSAuth",
+			errContains: "invalid AWS config: aws region is required for AWS authentication",
 		},
 		{
 			name: "AWS auth without credentials in aws config",
@@ -116,7 +119,7 @@ func Test_Config_validate(t *testing.T) {
 				},
 			},
 			expectedErr: true,
-			errContains: "credentials are required in AWSConfig when AuthMethod is AWSAuth",
+			errContains: "invalid AWS config: aws credentials are required for AWS authentication",
 		},
 		{
 			name: "Azure auth without AzureCreds",
@@ -126,7 +129,17 @@ func Test_Config_validate(t *testing.T) {
 				AuthMethod:  AzureAuth,
 			},
 			expectedErr: true,
-			errContains: "AzureCreds is required when AuthMethod is AzureAuth",
+			errContains: "invalid Azure config: azure credentials are required for Azure authentication",
+		},
+		{
+			name: "GCP auth without Credentials",
+			config: Config{
+				DatabaseURL: "postgres://user@host:5432/db",
+				Logger:      logger,
+				AuthMethod:  GCPAuth,
+			},
+			expectedErr: true,
+			errContains: "invalid GCP config: gcp credentials are required for GCP authentication",
 		},
 		{
 			name: "Unsupported auth method",
