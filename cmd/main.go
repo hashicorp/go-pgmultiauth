@@ -41,7 +41,9 @@ func main() {
 	useGCPAuth := authMethod == pgmultiauth.GCPAuth
 	useAzureAuth := authMethod == pgmultiauth.AzureAuth
 
-	authConfig, err := pgmultiauth.DefaultConfig(dbUrl, hclog.Default(), pgmultiauth.DefaultAuthConfigOptions{
+	ctx := context.Background()
+
+	authConfig, err := pgmultiauth.DefaultConfig(ctx, dbUrl, hclog.Default(), pgmultiauth.DefaultAuthConfigOptions{
 		UseAWSIAM:   useAWSIAMAuth,
 		AWSDBRegion: os.Getenv("AWS_REGION"),
 
@@ -55,14 +57,14 @@ func main() {
 		return
 	}
 
-	openTest(authConfig)
-	connectorTest(authConfig)
-	dbPoolTest(authConfig)
-	connectionURLTest(authConfig)
+	openTest(ctx, authConfig)
+	connectorTest(ctx, authConfig)
+	dbPoolTest(ctx, authConfig)
+	connectionURLTest(ctx, authConfig)
 }
 
-func openTest(authConfig pgmultiauth.Config) {
-	db, err := pgmultiauth.Open(authConfig)
+func openTest(ctx context.Context, authConfig pgmultiauth.Config) {
+	db, err := pgmultiauth.Open(ctx, authConfig)
 	if err != nil {
 		fmt.Println("failed to open database: %w", err)
 		return
@@ -78,8 +80,8 @@ func openTest(authConfig pgmultiauth.Config) {
 	fmt.Println("Successfully connected to the database using Open")
 }
 
-func connectorTest(authConfig pgmultiauth.Config) {
-	connector, err := pgmultiauth.GetConnector(authConfig)
+func connectorTest(ctx context.Context, authConfig pgmultiauth.Config) {
+	connector, err := pgmultiauth.GetConnector(ctx, authConfig)
 	if err != nil {
 		fmt.Println("failed to get connector: %w", err)
 		return
@@ -97,8 +99,7 @@ func connectorTest(authConfig pgmultiauth.Config) {
 	fmt.Println("Successfully connected to the database using connector")
 }
 
-func dbPoolTest(authConfig pgmultiauth.Config) {
-	ctx := context.Background()
+func dbPoolTest(ctx context.Context, authConfig pgmultiauth.Config) {
 	pool, err := pgmultiauth.NewDBPool(ctx, authConfig)
 	if err != nil {
 		fmt.Println("failed to create pool: %w", err)
@@ -115,8 +116,8 @@ func dbPoolTest(authConfig pgmultiauth.Config) {
 	fmt.Println("Successfully connected to the database using pool")
 }
 
-func connectionURLTest(authConfig pgmultiauth.Config) {
-	connURL, err := pgmultiauth.GetConnectionURL(authConfig)
+func connectionURLTest(ctx context.Context, authConfig pgmultiauth.Config) {
+	connURL, err := pgmultiauth.GetConnectionURL(ctx, authConfig)
 	if err != nil {
 		fmt.Println("failed to get connection URL: %w", err)
 		return
