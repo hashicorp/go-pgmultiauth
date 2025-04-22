@@ -11,7 +11,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/avast/retry-go/v4"
-	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/hashicorp/go-hclog"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -71,7 +71,7 @@ func (c Config) validate() error {
 		if c.AWSConfig == nil {
 			return fmt.Errorf("AWSConfig is required when AuthMethod is AWSAuth")
 		}
-		if c.AWSConfig.Region == nil {
+		if c.AWSConfig.Region == "" {
 			return fmt.Errorf("region is required in AWSConfig when AuthMethod is AWSAuth")
 		}
 		if c.AWSConfig.Credentials == nil {
@@ -99,7 +99,7 @@ func (c Config) authConfigured() bool {
 
 // Open initializes and returns a *sql.DB database connection
 // using the provided authentication configuration.
-func Open(config Config) (*sql.DB, error) {
+func Open(ctx context.Context, config Config) (*sql.DB, error) {
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
@@ -109,7 +109,7 @@ func Open(config Config) (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to parse database connection string: %v", err)
 	}
 
-	beforeConnect, err := BeforeConnectFn(config)
+	beforeConnect, err := BeforeConnectFn(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("generating before connect function: %v", err)
 	}
@@ -120,7 +120,7 @@ func Open(config Config) (*sql.DB, error) {
 
 // GetConnector initializes and returns a driver.Connector
 // using the provided authentication configuration.
-func GetConnector(config Config) (driver.Connector, error) {
+func GetConnector(ctx context.Context, config Config) (driver.Connector, error) {
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
@@ -130,7 +130,7 @@ func GetConnector(config Config) (driver.Connector, error) {
 		return nil, fmt.Errorf("failed to parse database connection string: %v", err)
 	}
 
-	beforeConnect, err := BeforeConnectFn(config)
+	beforeConnect, err := BeforeConnectFn(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("generating before connect function: %v", err)
 	}
@@ -150,7 +150,7 @@ func NewDBPool(ctx context.Context, config Config) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("failed to parse database connection string: %v", err)
 	}
 
-	beforeConnect, err := BeforeConnectFn(config)
+	beforeConnect, err := BeforeConnectFn(ctx, config)
 	if err != nil {
 		return nil, fmt.Errorf("generating before connect function: %v", err)
 	}
@@ -167,7 +167,7 @@ func NewDBPool(ctx context.Context, config Config) (*pgxpool.Pool, error) {
 
 // BeforeConnectFn returns a function that can be used to set up the
 // authentication before establishing a connection to the database.
-func BeforeConnectFn(config Config) (func(context.Context, *pgx.ConnConfig) error, error) {
+func BeforeConnectFn(ctx context.Context, config Config) (func(context.Context, *pgx.ConnConfig) error, error) {
 	if err := config.validate(); err != nil {
 		return nil, fmt.Errorf("invalid authentication configuration: %v", err)
 	}
@@ -177,7 +177,7 @@ func BeforeConnectFn(config Config) (func(context.Context, *pgx.ConnConfig) erro
 
 	if config.authConfigured() {
 		config.Logger.Info("getting initial db auth token")
-		token, err := getAuthTokenWithRetry(config)
+		token, err := getAuthTokenWithRetry(ctx, config)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get initial db token: %v", err)
 		}
@@ -199,7 +199,7 @@ func BeforeConnectFn(config Config) (func(context.Context, *pgx.ConnConfig) erro
 			// and the token might have been refreshed by a connection that acquired the lock first
 			if !token.valid() {
 				config.Logger.Info("refreshing db token")
-				token, err = getAuthTokenWithRetry(config)
+				token, err = getAuthTokenWithRetry(ctx, config)
 				if err != nil {
 					return fmt.Errorf("failed to get db token: %v", err)
 				}
@@ -215,7 +215,7 @@ func BeforeConnectFn(config Config) (func(context.Context, *pgx.ConnConfig) erro
 
 // GetConnectionURL returns the database connection URL based on the provided
 // authentication configuration.
-func GetConnectionURL(config Config) (string, error) {
+func GetConnectionURL(ctx context.Context, config Config) (string, error) {
 	if err := config.validate(); err != nil {
 		return "", fmt.Errorf("invalid authentication configuration: %v", err)
 	}
@@ -224,7 +224,7 @@ func GetConnectionURL(config Config) (string, error) {
 		return config.DatabaseURL, nil
 	}
 
-	token, err := getAuthTokenWithRetry(config)
+	token, err := getAuthTokenWithRetry(ctx, config)
 	if err != nil {
 		return "", fmt.Errorf("fetching auth token: %v", err)
 	}
@@ -242,13 +242,13 @@ func GetConnectionURL(config Config) (string, error) {
 // getAuthTokenWithRetry attempts to fetch an authentication token
 // with retries in case of failure. It uses exponential backoff
 // for retrying the request.
-func getAuthTokenWithRetry(config Config) (*authToken, error) {
+func getAuthTokenWithRetry(ctx context.Context, config Config) (*authToken, error) {
 	var token *authToken
 	var err error
 
 	err = retry.Do(
 		func() error {
-			token, err = getAuthToken(config)
+			token, err = getAuthToken(ctx, config)
 			return err
 		},
 		retry.Attempts(3),
@@ -274,12 +274,12 @@ type authToken struct {
 // authentication tokens. This allows for different implementations
 // for different authentication methods (AWS, GCP, Azure).
 type tokenGenerator interface {
-	generateToken() (*authToken, error)
+	generateToken(context.Context) (*authToken, error)
 }
 
 // getAuthToken returns an authentication token for the database connection
 // based on the provided authentication configuration.
-func getAuthToken(config Config) (*authToken, error) {
+func getAuthToken(ctx context.Context, config Config) (*authToken, error) {
 	var tokenGenerator tokenGenerator
 
 	switch {
@@ -307,7 +307,7 @@ func getAuthToken(config Config) (*authToken, error) {
 		return nil, fmt.Errorf("unsupported authentication method: %d", config.AuthMethod)
 	}
 
-	return tokenGenerator.generateToken()
+	return tokenGenerator.generateToken(ctx)
 }
 
 // replaceDBPassword replaces the password in a PostgreSQL connection URL
