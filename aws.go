@@ -52,7 +52,7 @@ func validateAWSConfig(awsConfig *aws.Config) error {
 		return fmt.Errorf("aws config is required for AWS authentication")
 	}
 
-	if awsConfig.Region == nil {
+	if awsConfig.Region == "" {
 		return fmt.Errorf("aws region is required for AWS authentication")
 	}
 
