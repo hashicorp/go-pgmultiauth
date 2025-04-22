@@ -30,3 +30,15 @@ func (c gcpTokenConfig) fetchGCPAuthToken() (*oauth2.Token, error) {
 
 	return token, nil
 }
+
+func validateGCPConfig(creds *google.Credentials) error {
+	if creds == nil {
+		return fmt.Errorf("gcp credentials are required for GCP authentication")
+	}
+
+	if creds.TokenSource == nil {
+		return fmt.Errorf("gcp token source is required for GCP authentication")
+	}
+
+	return nil
+}
