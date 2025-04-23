@@ -32,7 +32,7 @@ type DefaultAuthConfigOptions struct {
 // For GCP, it uses GCP default credentials
 // For Azure, it uses Managed Identity (MSI) authentication
 // For StandardAuth, it uses the default PostgreSQL authentication
-func DefaultConfig(ctx context.Context, dbURL string, logger hclog.Logger, opts DefaultAuthConfigOptions) (Config, error) {
+func DefaultConfig(ctx context.Context, connString string, logger hclog.Logger, opts DefaultAuthConfigOptions) (Config, error) {
 	authMode := GetAuthMode(opts.UseAWSIAM, opts.UseGCPDefaultCredentials, opts.UseAzureMSI)
 
 	var googleCreds *google.Credentials
@@ -71,7 +71,7 @@ func DefaultConfig(ctx context.Context, dbURL string, logger hclog.Logger, opts 
 	}
 
 	return Config{
-		DatabaseURL: dbURL,
+		ConnString:  connString,
 		Logger:      logger,
 		AuthMethod:  authMode,
 		AWSConfig:   awsConfig,

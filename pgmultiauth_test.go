@@ -24,18 +24,18 @@ func Test_Config_validate(t *testing.T) {
 		{
 			name: "Valid config with no auth",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  StandardAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: StandardAuth,
 			},
 			expectedErr: false,
 		},
 		{
 			name: "Valid config with AWS auth",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AWSAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: AWSAuth,
 				AWSConfig: &aws.Config{
 					Region:      "us-west-2",
 					Credentials: aws.AnonymousCredentials{},
@@ -46,9 +46,9 @@ func Test_Config_validate(t *testing.T) {
 		{
 			name: "Valid config with GCP auth",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  GCPAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: GCPAuth,
 				GoogleCreds: &google.Credentials{
 					TokenSource: oauth2.StaticTokenSource(&oauth2.Token{}),
 				},
@@ -58,29 +58,29 @@ func Test_Config_validate(t *testing.T) {
 		{
 			name: "Valid config with Azure auth",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AzureAuth,
-				AzureCreds:  &MockTokenCredential{},
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: AzureAuth,
+				AzureCreds: &MockTokenCredential{},
 			},
 			expectedErr: false,
 		},
 		{
-			name: "Empty DatabaseURL",
+			name: "Empty Database Connection String",
 			config: Config{
-				DatabaseURL: "",
-				Logger:      logger,
-				AuthMethod:  StandardAuth,
+				ConnString: "",
+				Logger:     logger,
+				AuthMethod: StandardAuth,
 			},
 			expectedErr: true,
-			errContains: "databaseURL cannot be empty",
+			errContains: "ConnString cannot be empty",
 		},
 		{
 			name: "Nil Logger",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      nil,
-				AuthMethod:  StandardAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     nil,
+				AuthMethod: StandardAuth,
 			},
 			expectedErr: true,
 			errContains: "logger cannot be nil",
@@ -88,9 +88,9 @@ func Test_Config_validate(t *testing.T) {
 		{
 			name: "AWS auth without aws config",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AWSAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: AWSAuth,
 			},
 			expectedErr: true,
 			errContains: "invalid AWS config: aws config is required for AWS authentication",
@@ -98,9 +98,9 @@ func Test_Config_validate(t *testing.T) {
 		{
 			name: "AWS auth without region in aws config",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AWSAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: AWSAuth,
 				AWSConfig: &aws.Config{
 					Credentials: aws.AnonymousCredentials{},
 				},
@@ -111,9 +111,9 @@ func Test_Config_validate(t *testing.T) {
 		{
 			name: "AWS auth without credentials in aws config",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AWSAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: AWSAuth,
 				AWSConfig: &aws.Config{
 					Region: "us-west-2",
 				},
@@ -124,9 +124,9 @@ func Test_Config_validate(t *testing.T) {
 		{
 			name: "Azure auth without AzureCreds",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AzureAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: AzureAuth,
 			},
 			expectedErr: true,
 			errContains: "invalid Azure config: azure credentials are required for Azure authentication",
@@ -134,9 +134,9 @@ func Test_Config_validate(t *testing.T) {
 		{
 			name: "GCP auth without Credentials",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  GCPAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: GCPAuth,
 			},
 			expectedErr: true,
 			errContains: "invalid GCP config: gcp credentials are required for GCP authentication",
@@ -144,9 +144,9 @@ func Test_Config_validate(t *testing.T) {
 		{
 			name: "Unsupported auth method",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AuthMethod(99), // Invalid value
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: AuthMethod(99), // Invalid value
 			},
 			expectedErr: true,
 			errContains: "unsupported authentication method: 99",
@@ -181,38 +181,38 @@ func Test_Config_authConfigured(t *testing.T) {
 		{
 			name: "No authentication configured",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  StandardAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: StandardAuth,
 			},
 			expected: false,
 		},
 		{
 			name: "AWS authentication configured",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AWSAuth,
-				AWSConfig:   &aws.Config{},
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: AWSAuth,
+				AWSConfig:  &aws.Config{},
 			},
 			expected: true,
 		},
 		{
 			name: "GCP authentication configured",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  GCPAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: GCPAuth,
 			},
 			expected: true,
 		},
 		{
 			name: "Azure authentication configured",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AzureAuth,
-				AzureCreds:  &MockTokenCredential{},
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: AzureAuth,
+				AzureCreds: &MockTokenCredential{},
 			},
 			expected: true,
 		},
@@ -306,80 +306,108 @@ func Test_GetAuthMode(t *testing.T) {
 
 func Test_replaceDBPassword(t *testing.T) {
 	tests := []struct {
-		name        string
-		inputURL    string
-		newPassword string
-		expectedURL string
-		expectError bool
+		name               string
+		inputConnString    string
+		newPassword        string
+		expectedConnString string
+		expectError        bool
 	}{
 		{
-			name:        "Basic URL with password",
-			inputURL:    "postgres://user:oldpass@localhost:5432/mydb",
-			newPassword: "newpass",
-			expectedURL: "postgres://user:newpass@localhost:5432/mydb",
-			expectError: false,
+			name:               "Basic URL with password",
+			inputConnString:    "postgres://user:oldpass@localhost:5432/mydb",
+			newPassword:        "newpass",
+			expectedConnString: "postgres://user:newpass@localhost:5432/mydb",
+			expectError:        false,
 		},
 		{
-			name:        "Basic postgresql URL with password",
-			inputURL:    "postgresql://user:oldpass@localhost:5432/mydb",
-			newPassword: "newpass",
-			expectedURL: "postgresql://user:newpass@localhost:5432/mydb",
-			expectError: false,
+			name:               "Basic postgresql URL with password",
+			inputConnString:    "postgresql://user:oldpass@localhost:5432/mydb",
+			newPassword:        "newpass",
+			expectedConnString: "postgresql://user:newpass@localhost:5432/mydb",
+			expectError:        false,
 		},
 		{
-			name:        "URL without password",
-			inputURL:    "postgres://user@localhost:5432/mydb",
-			newPassword: "newpass",
-			expectedURL: "postgres://user:newpass@localhost:5432/mydb",
-			expectError: false,
+			name:               "URL without password",
+			inputConnString:    "postgres://user@localhost:5432/mydb",
+			newPassword:        "newpass",
+			expectedConnString: "postgres://user:newpass@localhost:5432/mydb",
+			expectError:        false,
 		},
 		{
-			name:        "URL without password with :",
-			inputURL:    "postgres://user:@localhost:5432/mydb",
-			newPassword: "newpass",
-			expectedURL: "postgres://user:newpass@localhost:5432/mydb",
-			expectError: false,
+			name:               "URL without password with :",
+			inputConnString:    "postgres://user:@localhost:5432/mydb",
+			newPassword:        "newpass",
+			expectedConnString: "postgres://user:newpass@localhost:5432/mydb",
+			expectError:        false,
 		},
 		{
-			name:        "URL with search_path",
-			inputURL:    "postgres://user:oldpass@localhost:5432/mydb?options=-c%20search_path=rails",
-			newPassword: "newpass",
-			expectedURL: "postgres://user:newpass@localhost:5432/mydb?options=-c%20search_path=rails",
-			expectError: false,
+			name:               "URL with search_path",
+			inputConnString:    "postgres://user:oldpass@localhost:5432/mydb?options=-c%20search_path=rails",
+			newPassword:        "newpass",
+			expectedConnString: "postgres://user:newpass@localhost:5432/mydb?options=-c%20search_path=rails",
+			expectError:        false,
 		},
 		{
-			name:        "URL with multiple query parameters",
-			inputURL:    "postgres://user:oldpass@localhost:5432/mydb?options=-c%20search_path%3Drails&sslmode=disable",
-			newPassword: "newpass",
-			expectedURL: "postgres://user:newpass@localhost:5432/mydb?options=-c%20search_path%3Drails&sslmode=disable",
-			expectError: false,
+			name:               "URL with multiple query parameters",
+			inputConnString:    "postgres://user:oldpass@localhost:5432/mydb?options=-c%20search_path%3Drails&sslmode=disable",
+			newPassword:        "newpass",
+			expectedConnString: "postgres://user:newpass@localhost:5432/mydb?options=-c%20search_path%3Drails&sslmode=disable",
+			expectError:        false,
 		},
 		{
-			name:        "URL with special characters in password",
-			inputURL:    "postgres://user:old%40pass@localhost:5432/mydb",
-			newPassword: "new@pass&special!",
-			expectedURL: "postgres://user:new%40pass%26special%21@localhost:5432/mydb",
-			expectError: false,
+			name:               "URL with special characters in password",
+			inputConnString:    "postgres://user:old%40pass@localhost:5432/mydb",
+			newPassword:        "new@pass&special!",
+			expectedConnString: "postgres://user:new%40pass%26special%21@localhost:5432/mydb",
+			expectError:        false,
 		},
 		{
-			name:        "URL with options parameter",
-			inputURL:    "postgres://user:oldpass@localhost:5432/mydb?options=-c%20statement_timeout%3D5000",
-			newPassword: "newpass",
-			expectedURL: "postgres://user:newpass@localhost:5432/mydb?options=-c%20statement_timeout%3D5000",
-			expectError: false,
+			name:               "URL with options parameter",
+			inputConnString:    "postgres://user:oldpass@localhost:5432/mydb?options=-c%20statement_timeout%3D5000",
+			newPassword:        "newpass",
+			expectedConnString: "postgres://user:newpass@localhost:5432/mydb?options=-c%20statement_timeout%3D5000",
+			expectError:        false,
 		},
 		{
-			name:        "Invalid URL",
-			inputURL:    "postgres://user:oldp/mydb",
-			newPassword: "newpass",
-			expectedURL: "",
-			expectError: true,
+			name:               "Invalid URL",
+			inputConnString:    "postgres://user:oldp/mydb",
+			newPassword:        "newpass",
+			expectedConnString: "",
+			expectError:        true,
+		},
+		{
+			name:               "DSN string with no password",
+			inputConnString:    "user=foo dbname=bar host=localhost port=5432 sslmode=disable",
+			newPassword:        "newpass",
+			expectedConnString: "user=foo dbname=bar host=localhost port=5432 sslmode=disable password='newpass'",
+			expectError:        false,
+		},
+		{
+			name:               "DSN string with password",
+			inputConnString:    "user=foo password=existingPass dbname=bar host=localhost port=5432 sslmode=disable",
+			newPassword:        "newpass",
+			expectedConnString: "user=foo password='newpass' dbname=bar host=localhost port=5432 sslmode=disable",
+			expectError:        false,
+		},
+		{
+			name:               "DSN string with special characters in password",
+			inputConnString:    "user=foo dbname=bar host=localhost port=5432 sslmode=disable",
+			newPassword:        "new@pass&special!",
+			expectedConnString: "user=foo dbname=bar host=localhost port=5432 sslmode=disable password='new@pass&special!'",
+			expectError:        false,
+		},
+		{
+			name:               "DSN string with `'` in new password",
+			inputConnString:    "user=foo dbname=bar host=localhost port=5432 sslmode=disable",
+			newPassword:        "new'pass",
+			expectedConnString: "user=foo dbname=bar host=localhost port=5432 sslmode=disable password='new''pass'",
+			expectError:        false,
 		},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result, err := replaceDBPassword(tc.inputURL, tc.newPassword)
+			result, err := replaceDBPassword(tc.inputConnString, tc.newPassword)
 
 			if tc.expectError && err == nil {
 				t.Errorf("Expected error but got none")
@@ -392,8 +420,8 @@ func Test_replaceDBPassword(t *testing.T) {
 			}
 
 			if !tc.expectError {
-				if result != tc.expectedURL {
-					t.Errorf("Expected URL: %s, but got: %s", tc.expectedURL, result)
+				if result != tc.expectedConnString {
+					t.Errorf("Expected URL: %s, but got: %s", tc.expectedConnString, result)
 				}
 			}
 		})
