@@ -117,7 +117,7 @@ func dbPoolTest(ctx context.Context, authConfig pgmultiauth.Config) {
 }
 
 func connectionURLTest(ctx context.Context, authConfig pgmultiauth.Config) {
-	connURL, err := pgmultiauth.GetConnectionURL(ctx, authConfig)
+	connURL, err := pgmultiauth.GetAuthenticatedConnString(ctx, authConfig)
 	if err != nil {
 		fmt.Println("failed to get connection URL: %w", err)
 		return

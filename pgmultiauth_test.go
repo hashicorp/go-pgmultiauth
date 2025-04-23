@@ -124,28 +124,28 @@ func Test_Config_validate(t *testing.T) {
 		{
 			name: "AWS auth without region in aws config",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AWSAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: AWSAuth,
 				AWSConfig: &aws.Config{
 					Credentials: aws.AnonymousCredentials{},
 				},
 			},
 			expectedErr: true,
-			errContains: "region is required in AWSConfig when AuthMethod is AWSAuth",
+			errContains: "invalid AWS config: aws region is required for AWS authentication",
 		},
 		{
 			name: "AWS auth without credentials in aws config",
 			config: Config{
-				DatabaseURL: "postgres://user@host:5432/db",
-				Logger:      logger,
-				AuthMethod:  AWSAuth,
+				ConnString: "postgres://user@host:5432/db",
+				Logger:     logger,
+				AuthMethod: AWSAuth,
 				AWSConfig: &aws.Config{
 					Region: "us-west-2",
 				},
 			},
 			expectedErr: true,
-			errContains: "credentials are required in AWSConfig when AuthMethod is AWSAuth",
+			errContains: "invalid AWS config: aws credentials are required for AWS authentication",
 		},
 		{
 			name: "Azure auth without AzureCreds",
