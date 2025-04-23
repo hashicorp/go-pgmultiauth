@@ -30,7 +30,7 @@ go get github.com/hashicorp/go-pgmultiauth
 ```go
 
 authConfig := pgmultiauth.Config{
-    DatabaseURL:    "postgres://myuser@mydb.cluster-abc123.us-west-2.rds.amazonaws.com:5432/mydb",
+    ConnString:    "postgres://myuser@mydb.cluster-abc123.us-west-2.rds.amazonaws.com:5432/mydb",
     Logger:         logger,
     AWSConfig:      awsConfig,
 }
