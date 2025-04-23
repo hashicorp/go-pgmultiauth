@@ -6,6 +6,7 @@ import (
 	"database/sql/driver"
 	"fmt"
 	"net/url"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,8 +33,8 @@ const (
 
 // Config holds the configuration for the database.
 type Config struct {
-	DatabaseURL string
-	Logger      hclog.Logger
+	ConnString string
+	Logger     hclog.Logger
 
 	// Enum to specify the authentication method
 	AuthMethod AuthMethod
@@ -53,8 +54,8 @@ type Config struct {
 // validate checks if the Config has all required fields
 // and returns an error if validation fails.
 func (c Config) validate() error {
-	if c.DatabaseURL == "" {
-		return fmt.Errorf("databaseURL cannot be empty")
+	if c.ConnString == "" {
+		return fmt.Errorf("ConnString cannot be empty")
 	}
 
 	if c.Logger == nil {
@@ -102,7 +103,7 @@ func Open(ctx context.Context, config Config) (*sql.DB, error) {
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
 
-	connConfig, err := pgx.ParseConfig(config.DatabaseURL)
+	connConfig, err := pgx.ParseConfig(config.ConnString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database connection string: %v", err)
 	}
@@ -123,7 +124,7 @@ func GetConnector(ctx context.Context, config Config) (driver.Connector, error) 
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
 
-	connConfig, err := pgx.ParseConfig(config.DatabaseURL)
+	connConfig, err := pgx.ParseConfig(config.ConnString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database connection string: %v", err)
 	}
@@ -143,7 +144,7 @@ func NewDBPool(ctx context.Context, config Config) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("invalid auth configuration: %v", err)
 	}
 
-	connConfig, err := pgxpool.ParseConfig(config.DatabaseURL)
+	connConfig, err := pgxpool.ParseConfig(config.ConnString)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse database connection string: %v", err)
 	}
@@ -211,15 +212,16 @@ func BeforeConnectFn(ctx context.Context, config Config) (func(context.Context, 
 	return beforeConnect, nil
 }
 
-// GetConnectionURL returns the database connection URL based on the provided
-// authentication configuration.
-func GetConnectionURL(ctx context.Context, config Config) (string, error) {
+// GetAuthenticatedConnString returns the database connection string based on the provided
+// authentication configuration. It returns the original connection string if no authentication
+// method is configured.
+func GetAuthenticatedConnString(ctx context.Context, config Config) (string, error) {
 	if err := config.validate(); err != nil {
 		return "", fmt.Errorf("invalid authentication configuration: %v", err)
 	}
 
 	if !config.authConfigured() {
-		return config.DatabaseURL, nil
+		return config.ConnString, nil
 	}
 
 	token, err := getAuthTokenWithRetry(ctx, config)
@@ -229,12 +231,12 @@ func GetConnectionURL(ctx context.Context, config Config) (string, error) {
 
 	config.Logger.Info("db auth token fetched")
 
-	tokenBasedURL, err := replaceDBPassword(config.DatabaseURL, token.token)
+	connString, err := replaceDBPassword(config.ConnString, token.token)
 	if err != nil {
-		return "", fmt.Errorf("preparing database connection url with auth token: %v", err)
+		return "", fmt.Errorf("preparing database connection string with auth token: %v", err)
 	}
 
-	return tokenBasedURL, nil
+	return connString, nil
 }
 
 // getAuthTokenWithRetry attempts to fetch an authentication token
@@ -282,7 +284,7 @@ func getAuthToken(ctx context.Context, config Config) (*authToken, error) {
 
 	switch {
 	case config.AuthMethod == AWSAuth:
-		connConfig, err := pgx.ParseConfig(config.DatabaseURL)
+		connConfig, err := pgx.ParseConfig(config.ConnString)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse connection string: %v", err)
 		}
@@ -308,10 +310,27 @@ func getAuthToken(ctx context.Context, config Config) (*authToken, error) {
 	return tokenGenerator.generateToken(ctx)
 }
 
-// replaceDBPassword replaces the password in a PostgreSQL connection URL
-// If no password exists in the original URL, it adds one
-func replaceDBPassword(connectionURL string, newPassword string) (string, error) {
-	u, err := url.Parse(connectionURL)
+// replaceDBPassword replaces the password in a PostgreSQL connection String
+// If no password exists in the original string, it adds one
+func replaceDBPassword(connString string, newPassword string) (string, error) {
+	newConnString := ""
+
+	// connString may be a database URL or in PostgreSQL keyword/value format
+	if strings.HasPrefix(connString, "postgres://") || strings.HasPrefix(connString, "postgresql://") {
+		var err error
+		newConnString, err = replaceDBPasswordURL(connString, newPassword)
+		if err != nil {
+			return "", fmt.Errorf("preparing database connection url with auth token: %v", err)
+		}
+	} else {
+		newConnString = replaceDBPasswordDSN(connString, newPassword)
+	}
+
+	return newConnString, nil
+}
+
+func replaceDBPasswordURL(databaseURL, newPassword string) (string, error) {
+	u, err := url.Parse(databaseURL)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse connection URL: %w", err)
 	}
@@ -338,4 +357,31 @@ func replaceDBPassword(connectionURL string, newPassword string) (string, error)
 	}
 
 	return dbURL, nil
+}
+
+// replaceDBPasswordDSN replaces or adds the password in a PostgreSQL DSN (key=value format).
+// It ensures the DSN contains the provided password, replacing any existing password if present.
+func replaceDBPasswordDSN(connStr, newPassword string) string {
+	// Split the DSN into components
+	parts := strings.Split(connStr, " ")
+	passwordFound := false
+	result := make([]string, 0, len(parts))
+
+	escapedPassword := strings.ReplaceAll(newPassword, "'", "''")
+
+	for _, part := range parts {
+		// Check if this part contains the password
+		if strings.HasPrefix(part, "password=") {
+			result = append(result, fmt.Sprintf("password='%s'", escapedPassword))
+			passwordFound = true
+		} else {
+			result = append(result, part)
+		}
+	}
+
+	if !passwordFound {
+		result = append(result, fmt.Sprintf("password='%s'", escapedPassword))
+	}
+
+	return strings.Join(result, " ")
 }
