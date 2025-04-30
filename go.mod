@@ -49,6 +49,6 @@ require (
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
-	golang.org/x/oauth2 v0.28.0
+	golang.org/x/oauth2 v0.29.0
 	golang.org/x/sys v0.31.0 // indirect
 )
