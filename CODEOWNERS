@@ -3,4 +3,4 @@
 
 # The rules are evaluated in order, if a file matches multiple patterns, the last match "wins".
 # We want to have a default rule for all files
-* @kkavish @tauhid621
+* @hashicorp/tfe-india
