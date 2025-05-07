@@ -447,11 +447,9 @@ func TestStandardAuth(t *testing.T) {
 		require.NoError(t, err, "container error")
 		require.NotNil(t, container, "container is nil")
 
-		// Create system under test
-		natPort, err := container.MappedPort(ctx, "5432/tcp")
-		require.NoError(t, err, "error reading mapped port")
+		connURL, err = container.ConnectionString(ctx)
+		require.NoError(t, err, "reading connection string")
 
-		connURL = fmt.Sprintf("postgres://hashicorp:hashicorp@localhost:%s/hashicorp", natPort.Port())
 	}
 
 	config := Config{
@@ -462,6 +460,30 @@ func TestStandardAuth(t *testing.T) {
 
 	err := testConnectivity(t, config)
 	require.NoError(t, err, "Failed to test connectivity with standard auth")
+}
+
+func TestAWSAuth(t *testing.T) {
+	authMethod := os.Getenv("AUTH_MEHOD")
+
+	if authMethod != "aws" {
+		t.Skip("Skipping AWS auth test as AUTH_METHOD is not set to 'aws'")
+	}
+
+	connURL := os.Getenv("PGURL_AWS")
+	require.NotEmpty(t, connURL, "PGURL environment variable is not set")
+
+	awsRegion := os.Getenv("AWS_REGION")
+	require.NotEmpty(t, awsRegion, "AWS_REGION environment variable is not set")
+
+	config, err := DefaultConfig(context.Background(), connURL, hclog.NewNullLogger(), DefaultAuthConfigOptions{
+		UseAWSIAM:   true,
+		AWSDBRegion: awsRegion,
+	})
+	require.NoError(t, err, "Failed to create default config")
+	require.NotNil(t, config, "Config is nil")
+
+	err = testConnectivity(t, config)
+	require.NoError(t, err, "Failed to test connectivity with AWS auth")
 }
 
 func testConnectivity(t *testing.T, config Config) error {
@@ -480,7 +502,7 @@ func testConnectivity(t *testing.T, config Config) error {
 		return err
 	}
 
-	if err := connectionURLTest(ctx, config); err != nil {
+	if err := authenticatedConnStringTest(ctx, config); err != nil {
 		return err
 	}
 
@@ -490,7 +512,6 @@ func testConnectivity(t *testing.T, config Config) error {
 }
 
 func openTest(ctx context.Context, authConfig Config) error {
-
 	db, err := Open(ctx, authConfig)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
@@ -538,7 +559,7 @@ func dbPoolTest(ctx context.Context, authConfig Config) error {
 	return nil
 }
 
-func connectionURLTest(ctx context.Context, authConfig Config) error {
+func authenticatedConnStringTest(ctx context.Context, authConfig Config) error {
 	connURL, err := GetAuthenticatedConnString(ctx, authConfig)
 	if err != nil {
 		return fmt.Errorf("failed to get connection URL: %w", err)
