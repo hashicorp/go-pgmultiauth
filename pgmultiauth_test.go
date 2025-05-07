@@ -436,11 +436,15 @@ func Test_replaceDBPassword(t *testing.T) {
 	}
 }
 
-func TestStandardAuth(t *testing.T) {
+func TestConnectivity(t *testing.T) {
+	ctx := context.Background()
+
 	connURL := os.Getenv("PGURL")
+	authMethod := os.Getenv("AUTH_METHOD")
 
 	if connURL == "" {
-		ctx := context.Background()
+		require.Empty(t, authMethod, "AUTH_METHOD is set but PGURL is not set")
+
 		container, err := prepareTestDBContainer(ctx)
 		defer container.Terminate(ctx)
 
@@ -449,61 +453,23 @@ func TestStandardAuth(t *testing.T) {
 
 		connURL, err = container.ConnectionString(ctx)
 		require.NoError(t, err, "reading connection string")
-
 	}
 
-	config := Config{
-		ConnString: connURL,
-		Logger:     hclog.NewNullLogger(),
-		AuthMethod: StandardAuth,
+	if authMethod == "aws" {
+		require.NotEmpty(t, os.Getenv("AWS_REGION"), "AWS_REGION environment variable is not set")
 	}
 
-	err := testConnectivity(t, config)
-	require.NoError(t, err, "Failed to test connectivity with standard auth")
-}
-
-func TestAWSAuth(t *testing.T) {
-	authMethod := os.Getenv("AUTH_METHOD")
-
-	if authMethod != "aws" {
-		t.Skip("Skipping AWS auth test as AUTH_METHOD is not set to 'aws'")
-	}
-
-	connURL := os.Getenv("PGURL_AWS")
-	require.NotEmpty(t, connURL, "PGURL_AWS environment variable is not set")
-
-	awsRegion := os.Getenv("AWS_REGION")
-	require.NotEmpty(t, awsRegion, "AWS_REGION environment variable is not set")
-
-	config, err := DefaultConfig(context.Background(), connURL, hclog.NewNullLogger(), DefaultAuthConfigOptions{
-		UseAWSIAM:   true,
-		AWSDBRegion: awsRegion,
+	config, err := DefaultConfig(ctx, connURL, hclog.NewNullLogger(), DefaultAuthConfigOptions{
+		UseAWSIAM:                authMethod == "aws",
+		UseAzureMSI:              authMethod == "azure",
+		UseGCPDefaultCredentials: authMethod == "gcp",
+		AWSDBRegion:              os.Getenv("AWS_REGION"),
+		AzureClientID:            os.Getenv("AZURE_CLIENT_ID"),
 	})
 	require.NoError(t, err, "Failed to create default config")
-	require.NotNil(t, config, "Config is nil")
 
 	err = testConnectivity(t, config)
-	require.NoError(t, err, "Failed to test connectivity with AWS auth")
-}
-
-func TestAzureAuth(t *testing.T) {
-	authMethod := os.Getenv("AUTH_METHOD")
-
-	if authMethod != "azure" {
-		t.Skip("Skipping Azure auth test as AUTH_METHOD is not set to 'azure'")
-	}
-
-	connURL := os.Getenv("PGURL_AZURE")
-	require.NotEmpty(t, connURL, "PGURL_AZURE environment variable is not set")
-
-	config, err := DefaultConfig(context.Background(), connURL, hclog.NewNullLogger(), DefaultAuthConfigOptions{
-		UseAzureMSI: true,
-	})
-	require.NoError(t, err, "Failed to create default config")
-	require.NotNil(t, config, "Config is nil")
-
-	err = testConnectivity(t, config)
-	require.NoError(t, err, "Failed to test connectivity with Azure auth")
+	require.NoError(t, err, "Failed to test connectivity. authMethod: %s", authMethod)
 }
 
 func testConnectivity(t *testing.T, config Config) error {
