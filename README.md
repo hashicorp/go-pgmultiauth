@@ -12,9 +12,9 @@
 
 The module currently supports:
 
-- **AWS  Authentication**: For RDS and Aurora PostgreSQL instances
-- **GCP Authentication**: For Cloud SQL PostgreSQL instances
-- **Azure Authentication**: For Azure Database for PostgreSQL
+- **AWS  Authentication**: [For RDS and Aurora PostgreSQL instances](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.html)
+- **GCP Authentication**: [For Cloud SQL PostgreSQL instances](https://cloud.google.com/sql/docs/postgres/iam-authentication)
+- **Azure Authentication**: [For Azure Database for PostgreSQL](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/how-to-connect-with-managed-identity)
 
 ## Installation
 
@@ -80,3 +80,8 @@ if err != nil {
 
 db := sql.OpenDB(dbConnector)
 ```
+
+## Contributing
+
+Thank you for your interest in contributing! Please refer to [CONTRIBUTING.md](https://github.com/hashicorp/go-pgmultiauth/blob/main/.github/CONTRIBUTING.md)
+for guidance.
