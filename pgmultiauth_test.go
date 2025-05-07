@@ -1,12 +1,20 @@
 package pgmultiauth
 
 import (
+	"context"
+	"database/sql"
+	"fmt"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -426,4 +434,134 @@ func Test_replaceDBPassword(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestStandardAuth(t *testing.T) {
+	connURL := os.Getenv("PGURL")
+
+	if connURL == "" {
+		ctx := context.Background()
+		container, err := prepareTestDBContainer(ctx)
+		defer container.Terminate(ctx)
+
+		require.NoError(t, err, "container error")
+		require.NotNil(t, container, "container is nil")
+
+		// Create system under test
+		natPort, err := container.MappedPort(ctx, "5432/tcp")
+		require.NoError(t, err, "error reading mapped port")
+
+		connURL = fmt.Sprintf("postgres://hashicorp:hashicorp@localhost:%s/hashicorp", natPort.Port())
+	}
+
+	config := Config{
+		ConnString: connURL,
+		Logger:     hclog.NewNullLogger(),
+		AuthMethod: StandardAuth,
+	}
+
+	err := testConnectivity(t, config)
+	require.NoError(t, err, "Failed to test connectivity with standard auth")
+}
+
+func testConnectivity(t *testing.T, config Config) error {
+	t.Log("Testing connectivity to the database")
+
+	ctx := context.Background()
+	if err := openTest(ctx, config); err != nil {
+		return err
+	}
+
+	if err := connectorTest(ctx, config); err != nil {
+		return err
+	}
+
+	if err := dbPoolTest(ctx, config); err != nil {
+		return err
+	}
+
+	if err := connectionURLTest(ctx, config); err != nil {
+		return err
+	}
+
+	t.Log("All connectivity tests passed")
+
+	return nil
+}
+
+func openTest(ctx context.Context, authConfig Config) error {
+
+	db, err := Open(ctx, authConfig)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		return fmt.Errorf("pinging database: %w", err)
+	}
+
+	return nil
+}
+
+func connectorTest(ctx context.Context, authConfig Config) error {
+	connector, err := GetConnector(ctx, authConfig)
+	if err != nil {
+		return fmt.Errorf("failed to get connector: %w", err)
+
+	}
+
+	db := sql.OpenDB(connector)
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		return fmt.Errorf("pinging database: %w", err)
+	}
+
+	return nil
+}
+
+func dbPoolTest(ctx context.Context, authConfig Config) error {
+	pool, err := NewDBPool(ctx, authConfig)
+	if err != nil {
+		return fmt.Errorf("failed to create pool: %w", err)
+	}
+	defer pool.Close()
+
+	err = pool.Ping(ctx)
+	if err != nil {
+		return fmt.Errorf("pinging database: %w", err)
+	}
+
+	return nil
+}
+
+func connectionURLTest(ctx context.Context, authConfig Config) error {
+	connURL, err := GetAuthenticatedConnString(ctx, authConfig)
+	if err != nil {
+		return fmt.Errorf("failed to get connection URL: %w", err)
+	}
+
+	db, err := sql.Open("pgx", connURL)
+	if err != nil {
+		return fmt.Errorf("failed to open database: %w", err)
+	}
+	defer db.Close()
+	err = db.Ping()
+	if err != nil {
+		return fmt.Errorf("pinging database: %w", err)
+	}
+
+	return nil
+}
+
+func prepareTestDBContainer(ctx context.Context) (*postgres.PostgresContainer, error) {
+	return postgres.Run(ctx, "postgres:14",
+		postgres.WithDatabase("hashicorp"),
+		postgres.WithUsername("hashicorp"),
+		postgres.WithPassword("hashicorp"),
+		testcontainers.WithWaitStrategy(wait.ForLog("database system is ready to accept connections").WithOccurrence(2).WithStartupTimeout(10*time.Second)),
+	)
 }
