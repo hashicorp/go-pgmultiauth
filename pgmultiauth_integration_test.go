@@ -25,7 +25,11 @@ func TestConnectivity(t *testing.T) {
 		require.Empty(t, authMethod, "AUTH_METHOD is set but PGURL is not set")
 
 		container, err := prepareTestDBContainer(ctx)
-		defer container.Terminate(ctx)
+		defer func() {
+			if err := container.Terminate(ctx); err != nil {
+				t.Logf("Failed to terminate container: %v", err)
+			}
+		}()
 
 		require.NoError(t, err, "container error")
 		require.NotNil(t, container, "container is nil")
