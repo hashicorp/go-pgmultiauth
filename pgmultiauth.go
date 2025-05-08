@@ -64,7 +64,7 @@ func WithLogger(l hclog.Logger) ConfigOpt {
 }
 
 // WithawsConfig sets the AWS configuration for the database connection.
-func WithAWSConfig(cfg *aws.Config) ConfigOpt {
+func WithAWSAuth(cfg *aws.Config) ConfigOpt {
 	return func(c *Config) {
 		c.authMethod = AWSAuth
 		c.awsConfig = cfg
@@ -72,7 +72,7 @@ func WithAWSConfig(cfg *aws.Config) ConfigOpt {
 }
 
 // WithazureCreds sets the Azure credentials for the database connection.
-func WithAzureCreds(creds azcore.TokenCredential) ConfigOpt {
+func WithAzureAuth(creds azcore.TokenCredential) ConfigOpt {
 	return func(c *Config) {
 		c.authMethod = AzureAuth
 		c.azureCreds = creds
@@ -80,7 +80,7 @@ func WithAzureCreds(creds azcore.TokenCredential) ConfigOpt {
 }
 
 // WithGoogleCreds sets the Google credentials for the database connection.
-func WithGoogleCreds(creds *google.Credentials) ConfigOpt {
+func WithGoogleAuth(creds *google.Credentials) ConfigOpt {
 	return func(c *Config) {
 		c.authMethod = GCPAuth
 		c.googleCreds = creds

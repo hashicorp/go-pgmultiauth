@@ -31,7 +31,6 @@ go get github.com/hashicorp/go-pgmultiauth
 
 authConfig := NewConfig(
     connString,
-    WithAuthMethod(AWSAuth),
     WithAWSConfig(awsConfig),
 )
 

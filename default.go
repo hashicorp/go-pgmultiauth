@@ -38,14 +38,14 @@ func DefaultConfig(ctx context.Context, connString string, authOpts DefaultAuthC
 			return Config{}, fmt.Errorf("failed to load AWS config: %v", err)
 		}
 
-		opts = append(opts, WithAWSConfig(&cfg))
+		opts = append(opts, WithAWSAuth(&cfg))
 	} else if authOpts.AuthMethod == GCPAuth {
 		creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to get GCP credentials: %v", err)
 		}
 
-		opts = append(opts, WithGoogleCreds(creds))
+		opts = append(opts, WithGoogleAuth(creds))
 	} else if authOpts.AuthMethod == AzureAuth {
 		msiCredOpts := &azidentity.ManagedIdentityCredentialOptions{}
 		if authOpts.AzureClientID != "" {
@@ -57,7 +57,7 @@ func DefaultConfig(ctx context.Context, connString string, authOpts DefaultAuthC
 			return Config{}, fmt.Errorf("failed to create Azure managed identity credential: %v", err)
 		}
 
-		opts = append(opts, WithAzureCreds(msiCreds))
+		opts = append(opts, WithAzureAuth(msiCreds))
 	}
 	cfg := NewConfig(connString, opts...)
 
