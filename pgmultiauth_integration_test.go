@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -38,16 +37,20 @@ func TestConnectivity(t *testing.T) {
 		require.NoError(t, err, "reading connection string")
 	}
 
+	authMode := StandardAuth
 	if authMethod == "aws" {
+		authMode = AWSAuth
 		require.NotEmpty(t, os.Getenv("AWS_REGION"), "AWS_REGION environment variable is not set")
+	} else if authMethod == "gcp" {
+		authMode = GCPAuth
+	} else if authMethod == "azure" {
+		authMode = AzureAuth
 	}
 
-	config, err := DefaultConfig(ctx, connURL, hclog.NewNullLogger(), DefaultAuthConfigOptions{
-		UseAWSIAM:                authMethod == "aws",
-		UseAzureMSI:              authMethod == "azure",
-		UseGCPDefaultCredentials: authMethod == "gcp",
-		AWSDBRegion:              os.Getenv("AWS_REGION"),
-		AzureClientID:            os.Getenv("AZURE_CLIENT_ID"),
+	config, err := DefaultConfig(ctx, connURL, DefaultAuthConfigOptions{
+		AuthMethod:    authMode,
+		AWSDBRegion:   os.Getenv("AWS_REGION"),
+		AzureClientID: os.Getenv("AZURE_CLIENT_ID"),
 	})
 	require.NoError(t, err, "Failed to create default config")
 

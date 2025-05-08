@@ -4,20 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/hashicorp/go-hclog"
 	"golang.org/x/oauth2/google"
 )
 
 // DefaultAuthConfigOptions holds the configuration options for various authentication
 // methods.
 type DefaultAuthConfigOptions struct {
-	UseAWSIAM                bool
-	UseGCPDefaultCredentials bool
-	UseAzureMSI              bool
+	AuthMethod AuthMethod
 
 	// AWS IAM Auth
 	AWSDBRegion string
@@ -32,34 +27,29 @@ type DefaultAuthConfigOptions struct {
 // For GCP, it uses GCP default credentials
 // For Azure, it uses Managed Identity (MSI) authentication
 // For StandardAuth, it uses the default PostgreSQL authentication
-func DefaultConfig(ctx context.Context, connString string, logger hclog.Logger, opts DefaultAuthConfigOptions) (Config, error) {
-	authMode := GetAuthMode(opts.UseAWSIAM, opts.UseGCPDefaultCredentials, opts.UseAzureMSI)
-
-	var googleCreds *google.Credentials
-	var azureCreds azcore.TokenCredential
-	var awsConfig *aws.Config
-
-	if authMode == AWSAuth {
-		if opts.AWSDBRegion == "" {
+func DefaultConfig(ctx context.Context, connString string, authOpts DefaultAuthConfigOptions, opts ...ConfigOpt) (Config, error) {
+	if authOpts.AuthMethod == AWSAuth {
+		if authOpts.AWSDBRegion == "" {
 			return Config{}, fmt.Errorf("AWSDBRegion is required for AWS IAM authentication")
 		}
 
-		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(opts.AWSDBRegion))
+		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(authOpts.AWSDBRegion))
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to load AWS config: %v", err)
 		}
 
-		awsConfig = &cfg
-	} else if authMode == GCPAuth {
+		opts = append(opts, WithAWSConfig(&cfg))
+	} else if authOpts.AuthMethod == GCPAuth {
 		creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to get GCP credentials: %v", err)
 		}
-		googleCreds = creds
-	} else if authMode == AzureAuth {
+
+		opts = append(opts, WithGoogleCreds(creds))
+	} else if authOpts.AuthMethod == AzureAuth {
 		msiCredOpts := &azidentity.ManagedIdentityCredentialOptions{}
-		if opts.AzureClientID != "" {
-			msiCredOpts.ID = azidentity.ClientID(opts.AzureClientID)
+		if authOpts.AzureClientID != "" {
+			msiCredOpts.ID = azidentity.ClientID(authOpts.AzureClientID)
 		}
 
 		msiCreds, err := azidentity.NewManagedIdentityCredential(msiCredOpts)
@@ -67,31 +57,9 @@ func DefaultConfig(ctx context.Context, connString string, logger hclog.Logger, 
 			return Config{}, fmt.Errorf("failed to create Azure managed identity credential: %v", err)
 		}
 
-		azureCreds = msiCreds
+		opts = append(opts, WithAzureCreds(msiCreds))
 	}
+	cfg := NewConfig(connString, opts...)
 
-	return Config{
-		ConnString:  connString,
-		Logger:      logger,
-		AuthMethod:  authMode,
-		AWSConfig:   awsConfig,
-		AzureCreds:  azureCreds,
-		GoogleCreds: googleCreds,
-	}, nil
-}
-
-// GetAuthMode returns the authentication method based on the provided flags.
-// It prioritizes AWS IAM authentication, followed by GCP and Azure authentication.
-// If none of the flags are set, it returns StandardAuth.
-func GetAuthMode(useAWSIAMAuth bool, useGCPAuth bool, useAzureAuth bool) AuthMethod {
-	switch {
-	case useAWSIAMAuth:
-		return AWSAuth
-	case useGCPAuth:
-		return GCPAuth
-	case useAzureAuth:
-		return AzureAuth
-	default:
-		return StandardAuth
-	}
+	return cfg, nil
 }
