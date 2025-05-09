@@ -29,11 +29,10 @@ go get github.com/hashicorp/go-pgmultiauth
 
 ```go
 
-authConfig := pgmultiauth.Config{
-    ConnString:    "postgres://myuser@mydb.cluster-abc123.us-west-2.rds.amazonaws.com:5432/mydb",
-    Logger:         logger,
-    AWSConfig:      awsConfig,
-}
+authConfig := NewConfig(
+    connString,
+    WithAWSConfig(awsConfig),
+)
 
 db, err := pgmultiauth.Open(ctx, authConfig)
 if err != nil {
