@@ -96,6 +96,6 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/testcontainers/testcontainers-go v0.37.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.37.0
-	golang.org/x/oauth2 v0.29.0
+	golang.org/x/oauth2 v0.30.0
 	golang.org/x/sys v0.32.0 // indirect
 )
