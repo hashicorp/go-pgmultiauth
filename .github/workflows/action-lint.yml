@@ -33,6 +33,7 @@ jobs:
       - name: "Run integration tests on AWS"
         run: |
           echo "Running integration tests for AWS..."
-          # Add your integration test commands here
+
           go test -v ./... -timeout=120s -run TestConnectivity
+          
           echo "Integration tests completed successfully."
