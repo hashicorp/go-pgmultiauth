@@ -16,3 +16,21 @@ jobs:
         uses: docker://docker.mirror.hashicorp.services/rhysd/actionlint@sha256:93834930f56ca380be3e9a3377670d7aa5921be251b9c774891a39b3629b83b8
         with:
           args: -color
+  integration-aws:
+    runs-on: aws
+    env:
+      AUTH_METHOD: aws
+      AWS_REGION: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      PGURL: ${{ secrets.AWS_DB_URL }}
+    steps:
+      - uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac # v4.0.0
+      - name: Setup Go
+        uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v4.0.0
+        with:
+          go-version-file: go.mod
+      - name: "Run integration tests on AWS"
+        run: |
+          echo "Running integration tests for AWS..."
+          # Add your integration test commands here
+          go test -v ./... -timeout=120s -run TestConnectivity
+          echo "Integration tests completed successfully."
