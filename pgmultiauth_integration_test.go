@@ -15,7 +15,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-func TestConnectivity(t *testing.T) {
+func TestConnectivityIntegration(t *testing.T) {
 	ctx := context.Background()
 
 	connURL := os.Getenv("PGURL")
