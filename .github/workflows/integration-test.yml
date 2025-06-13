@@ -1,0 +1,39 @@
+# Copyright (c) HashiCorp, Inc.
+# SPDX-License-Identifier: MPL-2.0
+
+name: Integration Tests
+on:
+  push:
+    branches:
+      - "main"
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * 0" # Every Sunday at midnight UTC
+
+permissions:
+  contents: read
+
+jobs:
+  integration-aws:
+    runs-on: aws
+    env:
+      AUTH_METHOD: aws
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      PGURL: ${{ secrets.AWS_DB_URL }}
+    steps:
+      - uses: actions/checkout@3df4ab11eba7bda6032a0b82a6bb43b11571feac # v4.0.0
+
+      - name: Setup Go
+        uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v4.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Download go modules
+        run: go mod download
+
+      - name: "Run integration tests on AWS"
+        run: |
+          echo "Running integration tests for AWS..."
+          go test -v ./... -timeout=120s -run Integration
+          echo "Integration tests completed successfully."
