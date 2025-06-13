@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
@@ -51,7 +52,7 @@ func TestConnectivity(t *testing.T) {
 		AuthMethod:    authMode,
 		AWSDBRegion:   os.Getenv("AWS_REGION"),
 		AzureClientID: os.Getenv("AZURE_CLIENT_ID"),
-	})
+	}, WithLogger(hclog.Default().Named("pgmultiauth_test")))
 	require.NoError(t, err, "Failed to create default config")
 
 	err = testConnectivity(t, config)
