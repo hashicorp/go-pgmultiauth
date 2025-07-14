@@ -59,10 +59,10 @@ type Config struct {
 // ConfigOpt provides a method to customize a Config.
 type ConfigOpt func(r *Config)
 
-// WithLogger overrides the default hclog.Logger.
+// WithLogger sets the logger for the Config.
 func WithLogger(l hclog.Logger) ConfigOpt {
 	return func(c *Config) {
-		c.logger = l
+		c.logger = l.Named("pgmultiauth")
 	}
 }
 
@@ -97,7 +97,7 @@ func NewConfig(connString string, opts ...ConfigOpt) Config {
 	cfg := Config{
 		connString: connString,
 
-		// Expect logger to be set by the caller via ConfigOpt
+		// Expect logger to be set by the caller via WithLogger().
 		logger: hclog.NewNullLogger(),
 	}
 
