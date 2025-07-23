@@ -3,7 +3,7 @@ module github.com/hashicorp/go-pgmultiauth
 go 1.24
 
 require (
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.1
 	github.com/hashicorp/go-hclog v1.6.3
 	github.com/stretchr/testify v1.10.0
 )
