@@ -90,9 +90,9 @@ require (
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.10.1
 	github.com/avast/retry-go/v4 v4.6.1
-	github.com/aws/aws-sdk-go-v2 v1.38.2
+	github.com/aws/aws-sdk-go-v2 v1.39.0
 	github.com/aws/aws-sdk-go-v2/config v1.31.4
-	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.6.4
+	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.6.7
 	github.com/fatih/color v1.13.0 // indirect
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/mattn/go-colorable v0.1.12 // indirect
