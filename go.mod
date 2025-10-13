@@ -1,6 +1,6 @@
 module github.com/hashicorp/go-pgmultiauth
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.19.0
@@ -99,6 +99,6 @@ require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/testcontainers/testcontainers-go v0.38.0
 	github.com/testcontainers/testcontainers-go/modules/postgres v0.38.0
-	golang.org/x/oauth2 v0.30.0
+	golang.org/x/oauth2 v0.32.0
 	golang.org/x/sys v0.34.0 // indirect
 )
