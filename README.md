@@ -14,7 +14,7 @@ The module currently supports:
 
 - **AWS  Authentication**: [For RDS and Aurora PostgreSQL instances](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.IAMDBAuth.html)
 - **GCP Authentication**: [For Cloud SQL PostgreSQL instances](https://cloud.google.com/sql/docs/postgres/iam-authentication)
-- **Azure Authentication**: [For Azure Database for PostgreSQL](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/how-to-connect-with-managed-identity)
+- **Azure Authentication**: [For Azure Database for PostgreSQL(Managed Identity)](https://learn.microsoft.com/en-us/azure/postgresql/flexible-server/how-to-connect-with-managed-identity), [Workload Identity](https://learn.microsoft.com/en-us/azure/aks/workload-identity-overview)
 
 ## Installation
 
