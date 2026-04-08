@@ -4,9 +4,12 @@
 package pgmultiauth
 
 import (
+	"context"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/require"
@@ -350,6 +353,269 @@ func Test_replaceDBPassword(t *testing.T) {
 				if result != tc.expectedconnString {
 					t.Errorf("Expected URL: %s, but got: %s", tc.expectedconnString, result)
 				}
+			}
+		})
+	}
+}
+
+func Test_resolveIRSAConfig(t *testing.T) {
+	tests := []struct {
+		name          string
+		roleARN       string
+		tokenFile     string
+		envRoleARN    string
+		envTokenFile  string
+		expectedRole  string
+		expectedToken string
+	}{
+		{
+			name:          "Explicit values take precedence over env vars",
+			roleARN:       "arn:aws:iam::123456789012:role/explicit-role",
+			tokenFile:     "/var/run/secrets/explicit-token",
+			envRoleARN:    "arn:aws:iam::999999999999:role/env-role",
+			envTokenFile:  "/var/run/secrets/env-token",
+			expectedRole:  "arn:aws:iam::123456789012:role/explicit-role",
+			expectedToken: "/var/run/secrets/explicit-token",
+		},
+		{
+			name:          "Falls back to env vars when options are empty",
+			roleARN:       "",
+			tokenFile:     "",
+			envRoleARN:    "arn:aws:iam::123456789012:role/env-role",
+			envTokenFile:  "/var/run/secrets/eks/serviceaccount/token",
+			expectedRole:  "arn:aws:iam::123456789012:role/env-role",
+			expectedToken: "/var/run/secrets/eks/serviceaccount/token",
+		},
+		{
+			name:          "No IRSA configured",
+			roleARN:       "",
+			tokenFile:     "",
+			envRoleARN:    "",
+			envTokenFile:  "",
+			expectedRole:  "",
+			expectedToken: "",
+		},
+		{
+			name:          "Explicit role ARN with env token file",
+			roleARN:       "arn:aws:iam::123456789012:role/explicit-role",
+			tokenFile:     "",
+			envRoleARN:    "",
+			envTokenFile:  "/var/run/secrets/env-token",
+			expectedRole:  "arn:aws:iam::123456789012:role/explicit-role",
+			expectedToken: "/var/run/secrets/env-token",
+		},
+		{
+			name:          "Env role ARN with explicit token file",
+			roleARN:       "",
+			tokenFile:     "/var/run/secrets/explicit-token",
+			envRoleARN:    "arn:aws:iam::123456789012:role/env-role",
+			envTokenFile:  "",
+			expectedRole:  "arn:aws:iam::123456789012:role/env-role",
+			expectedToken: "/var/run/secrets/explicit-token",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("AWS_ROLE_ARN", tc.envRoleARN)
+			t.Setenv("AWS_WEB_IDENTITY_TOKEN_FILE", tc.envTokenFile)
+
+			role, token := resolveIRSAConfig(tc.roleARN, tc.tokenFile)
+
+			require.Equal(t, tc.expectedRole, role)
+			require.Equal(t, tc.expectedToken, token)
+		})
+	}
+}
+
+func Test_configureIRSACredentials(t *testing.T) {
+	tests := []struct {
+		name               string
+		roleARN            string
+		tokenFile          string
+		expectCredsSwapped bool
+	}{
+		{
+			name:               "Both role ARN and token file set",
+			roleARN:            "arn:aws:iam::123456789012:role/test-role",
+			tokenFile:          "/var/run/secrets/eks/serviceaccount/token",
+			expectCredsSwapped: true,
+		},
+		{
+			name:               "Only role ARN set",
+			roleARN:            "arn:aws:iam::123456789012:role/test-role",
+			tokenFile:          "",
+			expectCredsSwapped: false,
+		},
+		{
+			name:               "Only token file set",
+			roleARN:            "",
+			tokenFile:          "/var/run/secrets/eks/serviceaccount/token",
+			expectCredsSwapped: false,
+		},
+		{
+			name:               "Neither set",
+			roleARN:            "",
+			tokenFile:          "",
+			expectCredsSwapped: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			originalCreds := aws.AnonymousCredentials{}
+			cfg := aws.Config{
+				Region:      "us-west-2",
+				Credentials: originalCreds,
+			}
+
+			configureIRSACredentials(&cfg, tc.roleARN, tc.tokenFile)
+
+			if tc.expectCredsSwapped {
+				// When IRSA is configured, credentials should be replaced
+				// with a CredentialsCache wrapping the web identity provider
+				_, isAnonymous := cfg.Credentials.(aws.AnonymousCredentials)
+				require.False(t, isAnonymous, "Expected credentials to be replaced with IRSA provider")
+			} else {
+				// Credentials should remain unchanged
+				_, isAnonymous := cfg.Credentials.(aws.AnonymousCredentials)
+				require.True(t, isAnonymous, "Expected credentials to remain unchanged")
+			}
+		})
+	}
+}
+
+func Test_Config_validate_IRSA(t *testing.T) {
+	logger := hclog.NewNullLogger()
+
+	// Simulate IRSA-resolved credentials by using a mock credentials provider.
+	// On EKS with IRSA, the AWS SDK resolves credentials via the web identity
+	// token, resulting in a non-nil CredentialsProvider on the aws.Config.
+	irsaCreds := aws.CredentialsProviderFunc(func(ctx context.Context) (aws.Credentials, error) {
+		return aws.Credentials{
+			AccessKeyID:     "ASIAMOCKKEY",
+			SecretAccessKey: "mockSecret",
+			SessionToken:    "mockSessionToken",
+			Source:          "WebIdentityToken",
+		}, nil
+	})
+
+	tests := []struct {
+		name        string
+		config      Config
+		expectedErr bool
+		errContains string
+	}{
+		{
+			name: "Valid config with IRSA credentials",
+			config: Config{
+				connString: "postgres://user@host:5432/db",
+				logger:     logger,
+				authMethod: AWSAuth,
+				awsConfig: &aws.Config{
+					Region:      "us-west-2",
+					Credentials: irsaCreds,
+				},
+			},
+			expectedErr: false,
+		},
+		{
+			name: "IRSA credentials with missing region",
+			config: Config{
+				connString: "postgres://user@host:5432/db",
+				logger:     logger,
+				authMethod: AWSAuth,
+				awsConfig: &aws.Config{
+					Credentials: irsaCreds,
+				},
+			},
+			expectedErr: true,
+			errContains: "invalid AWS config: aws region is required for AWS authentication",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.validate()
+			if tt.expectedErr {
+				require.Error(t, err)
+				require.EqualError(t, err, tt.errContains)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+// mockSTSClient implements stsCallerIdentityAPI for testing.
+type mockSTSClient struct {
+	output *sts.GetCallerIdentityOutput
+	err    error
+}
+
+func (m *mockSTSClient) GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	return m.output, m.err
+}
+
+func Test_validateAWSIdentityWithClient(t *testing.T) {
+	tests := []struct {
+		name        string
+		client      stsCallerIdentityAPI
+		expected    *AWSCallerIdentity
+		expectedErr bool
+		errContains string
+	}{
+		{
+			name: "Successful identity validation",
+			client: &mockSTSClient{
+				output: &sts.GetCallerIdentityOutput{
+					Account: aws.String("123456789012"),
+					Arn:     aws.String("arn:aws:sts::123456789012:assumed-role/my-irsa-role/session"),
+					UserId:  aws.String("AROA3XFRBF23:session"),
+				},
+			},
+			expected: &AWSCallerIdentity{
+				Account: "123456789012",
+				ARN:     "arn:aws:sts::123456789012:assumed-role/my-irsa-role/session",
+				UserID:  "AROA3XFRBF23:session",
+			},
+		},
+		{
+			name: "IRSA assumed-role identity",
+			client: &mockSTSClient{
+				output: &sts.GetCallerIdentityOutput{
+					Account: aws.String("111122223333"),
+					Arn:     aws.String("arn:aws:sts::111122223333:assumed-role/eks-irsa-tfe-postgres/aws-sdk-go-v2-1234567890"),
+					UserId:  aws.String("AROAEXAMPLE:aws-sdk-go-v2-1234567890"),
+				},
+			},
+			expected: &AWSCallerIdentity{
+				Account: "111122223333",
+				ARN:     "arn:aws:sts::111122223333:assumed-role/eks-irsa-tfe-postgres/aws-sdk-go-v2-1234567890",
+				UserID:  "AROAEXAMPLE:aws-sdk-go-v2-1234567890",
+			},
+		},
+		{
+			name: "STS call fails",
+			client: &mockSTSClient{
+				err: fmt.Errorf("ExpiredTokenException: token has expired"),
+			},
+			expectedErr: true,
+			errContains: "sts GetCallerIdentity",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			identity, err := validateAWSIdentityWithClient(context.Background(), tc.client)
+
+			if tc.expectedErr {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), tc.errContains)
+				require.Nil(t, identity)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tc.expected, identity)
 			}
 		})
 	}

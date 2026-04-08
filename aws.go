@@ -10,6 +10,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 )
 
 type awsTokenConfig struct {
@@ -64,4 +65,46 @@ func validateAWSConfig(awsConfig *aws.Config) error {
 	}
 
 	return nil
+}
+
+// AWSCallerIdentity holds the result of an STS GetCallerIdentity call.
+// It is useful for verifying that the AWS credential chain (including IRSA)
+// is configured correctly at runtime.
+type AWSCallerIdentity struct {
+	Account string
+	ARN     string
+	UserID  string
+}
+
+// stsCallerIdentityAPI is the subset of the STS client used by ValidateAWSIdentity.
+// Accepting an interface rather than the concrete *sts.Client allows callers to
+// inject a mock during testing.
+type stsCallerIdentityAPI interface {
+	GetCallerIdentity(ctx context.Context, params *sts.GetCallerIdentityInput, optFns ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error)
+}
+
+// ValidateAWSIdentity calls STS GetCallerIdentity using the credentials in the
+// provided aws.Config. It returns the resolved identity, which is useful for
+// verifying that IRSA or another credential source is active.
+//
+// Example:
+//
+//	identity, err := pgmultiauth.ValidateAWSIdentity(ctx, cfg)
+//	if err != nil { log.Fatal(err) }
+//	fmt.Println("Running as", identity.ARN)
+func ValidateAWSIdentity(ctx context.Context, cfg *aws.Config) (*AWSCallerIdentity, error) {
+	client := sts.NewFromConfig(*cfg)
+	return validateAWSIdentityWithClient(ctx, client)
+}
+
+func validateAWSIdentityWithClient(ctx context.Context, client stsCallerIdentityAPI) (*AWSCallerIdentity, error) {
+	out, err := client.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		return nil, fmt.Errorf("sts GetCallerIdentity: %w", err)
+	}
+	return &AWSCallerIdentity{
+		Account: aws.ToString(out.Account),
+		ARN:     aws.ToString(out.Arn),
+		UserID:  aws.ToString(out.UserId),
+	}, nil
 }
