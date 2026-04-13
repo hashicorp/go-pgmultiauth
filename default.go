@@ -6,14 +6,10 @@ package pgmultiauth
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"golang.org/x/oauth2/google"
 )
 
@@ -24,16 +20,6 @@ type DefaultAuthConfigOptions struct {
 
 	// AWS IAM Auth
 	AWSDBRegion string
-
-	// AWSRoleARN is the ARN of the IAM role to assume using IRSA
-	// (IAM Roles for Service Accounts) on EKS. When empty, falls back
-	// to the AWS_ROLE_ARN environment variable.
-	AWSRoleARN string
-
-	// AWSWebIdentityTokenFile is the path to the projected service account
-	// token used for IRSA authentication on EKS. When empty, falls back
-	// to the AWS_WEB_IDENTITY_TOKEN_FILE environment variable.
-	AWSWebIdentityTokenFile string
 
 	// ClientID for Azure MSI Auth
 	AzureClientID string
@@ -51,16 +37,14 @@ func DefaultConfig(ctx context.Context, connString string, authOpts DefaultAuthC
 			return Config{}, fmt.Errorf("AWSDBRegion is required for AWS IAM authentication")
 		}
 
+		// LoadDefaultConfig uses the AWS SDK default credential chain, which
+		// automatically supports IRSA (via AWS_ROLE_ARN and AWS_WEB_IDENTITY_TOKEN_FILE
+		// env vars on EKS), EC2 instance profiles, environment variables, shared
+		// credentials files, and other standard credential sources.
 		cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(authOpts.AWSDBRegion))
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to load AWS config: %v", err)
 		}
-
-		// Configure IRSA (Web Identity Token) credentials when available.
-		// On EKS with IRSA, the pod has AWS_ROLE_ARN and AWS_WEB_IDENTITY_TOKEN_FILE
-		// environment variables injected by the service account token volume projection.
-		roleARN, tokenFile := resolveIRSAConfig(authOpts.AWSRoleARN, authOpts.AWSWebIdentityTokenFile)
-		configureIRSACredentials(&cfg, roleARN, tokenFile)
 
 		opts = append(opts, WithAWSAuth(&cfg))
 	} else if authOpts.AuthMethod == GCPAuth {
@@ -98,31 +82,4 @@ func DefaultConfig(ctx context.Context, connString string, authOpts DefaultAuthC
 	cfg := NewConfig(connString, opts...)
 
 	return cfg, nil
-}
-
-// resolveIRSAConfig returns the IRSA role ARN and token file path,
-// preferring explicit configuration values over environment variables.
-func resolveIRSAConfig(roleARN, tokenFile string) (string, string) {
-	if roleARN == "" {
-		roleARN = os.Getenv("AWS_ROLE_ARN")
-	}
-	if tokenFile == "" {
-		tokenFile = os.Getenv("AWS_WEB_IDENTITY_TOKEN_FILE")
-	}
-	return roleARN, tokenFile
-}
-
-// configureIRSACredentials sets up IRSA (Web Identity Token) credentials
-// on the AWS config when both role ARN and token file are provided.
-func configureIRSACredentials(cfg *aws.Config, roleARN, tokenFile string) {
-	if roleARN == "" || tokenFile == "" {
-		return
-	}
-	stsClient := sts.NewFromConfig(*cfg)
-	provider := stscreds.NewWebIdentityRoleProvider(
-		stsClient,
-		roleARN,
-		stscreds.IdentityTokenFile(tokenFile),
-	)
-	cfg.Credentials = aws.NewCredentialsCache(provider)
 }
