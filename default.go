@@ -6,8 +6,8 @@ package pgmultiauth
 import (
 	"context"
 	"fmt"
+	"os"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"golang.org/x/oauth2/google"
@@ -21,7 +21,8 @@ type DefaultAuthConfigOptions struct {
 	// AWS IAM Auth
 	AWSDBRegion string
 
-	// ClientID for Azure MSI Auth
+	// ClientID for Azure user-assigned managed identity when workload identity
+	// environment variables are not present.
 	AzureClientID string
 }
 
@@ -29,7 +30,8 @@ type DefaultAuthConfigOptions struct {
 // For Cloud based auth it assumes that application is running in the cloud environment.
 // For AWS, it uses AWS IAM authentication
 // For GCP, it uses GCP default credentials
-// For Azure, it uses Workload Identity or Managed Identity (MSI) authentication
+// For Azure, it uses DefaultAzureCredential, which supports workload identity,
+// managed identity, and local developer credentials.
 // For StandardAuth, it uses the default PostgreSQL authentication
 func DefaultConfig(ctx context.Context, connString string, authOpts DefaultAuthConfigOptions, opts ...ConfigOpt) (Config, error) {
 	if authOpts.AuthMethod == AWSAuth {
@@ -51,24 +53,9 @@ func DefaultConfig(ctx context.Context, connString string, authOpts DefaultAuthC
 
 		opts = append(opts, WithGoogleAuth(creds))
 	} else if authOpts.AuthMethod == AzureAuth {
-		// Use a credential chain to support Workload Identity and Managed Identity.
-		var sources []azcore.TokenCredential
+		prepareAzureDefaultCredentialEnv(authOpts)
 
-		// 1. Workload Identity
-		if wiCred, err := azidentity.NewWorkloadIdentityCredential(nil); err == nil {
-			sources = append(sources, wiCred)
-		}
-
-		// 2. Managed Identity
-		msiCredOpts := &azidentity.ManagedIdentityCredentialOptions{}
-		if authOpts.AzureClientID != "" {
-			msiCredOpts.ID = azidentity.ClientID(authOpts.AzureClientID)
-		}
-		if msiCred, err := azidentity.NewManagedIdentityCredential(msiCredOpts); err == nil {
-			sources = append(sources, msiCred)
-		}
-
-		creds, err := azidentity.NewChainedTokenCredential(sources, nil)
+		creds, err := azidentity.NewDefaultAzureCredential(nil)
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to create Azure credential: %v", err)
 		}
@@ -78,4 +65,18 @@ func DefaultConfig(ctx context.Context, connString string, authOpts DefaultAuthC
 	cfg := NewConfig(connString, opts...)
 
 	return cfg, nil
+}
+
+func prepareAzureDefaultCredentialEnv(authOpts DefaultAuthConfigOptions) {
+	if authOpts.AzureClientID == "" {
+		return
+	}
+
+	_, hasFederatedTokenFile := os.LookupEnv("AZURE_FEDERATED_TOKEN_FILE")
+	_, hasTenantID := os.LookupEnv("AZURE_TENANT_ID")
+	if hasFederatedTokenFile || hasTenantID {
+		return
+	}
+
+	_ = os.Setenv("AZURE_CLIENT_ID", authOpts.AzureClientID)
 }
