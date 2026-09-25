@@ -94,7 +94,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.31.15
 	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.6.4
 	github.com/fatih/color v1.13.0 // indirect
-	github.com/jackc/pgx/v5 v5.7.5
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/mattn/go-colorable v0.1.12 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/testcontainers/testcontainers-go v0.38.0
