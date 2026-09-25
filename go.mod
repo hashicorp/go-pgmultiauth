@@ -1,6 +1,6 @@
 module github.com/hashicorp/go-pgmultiauth
 
-go 1.24
+go 1.26.8
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.19.0
