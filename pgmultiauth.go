@@ -208,8 +208,9 @@ func NewDBPool(ctx context.Context, config Config) (*pgxpool.Pool, error) {
 	connConfig.BeforeConnect = beforeConnect
 
 	// Check if the connection is still valid before acquiring it
-	connConfig.BeforeAcquire = func(ctx context.Context, conn *pgx.Conn) bool {
-		return conn.Ping(ctx) == nil
+	connConfig.PrepareConn = func(ctx context.Context, conn *pgx.Conn) (bool, error) {
+		result := conn.Ping(ctx) == nil
+		return result, nil
 	}
 
 	return pgxpool.NewWithConfig(ctx, connConfig)
