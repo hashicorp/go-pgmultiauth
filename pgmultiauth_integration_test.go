@@ -91,7 +91,9 @@ func openTest(ctx context.Context, authConfig Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+    _ = db.Close()
+}()
 
 	err = db.Ping()
 	if err != nil {
@@ -109,7 +111,9 @@ func connectorTest(ctx context.Context, authConfig Config) error {
 	}
 
 	db := sql.OpenDB(connector)
-	defer db.Close()
+	defer func() {
+    _ = db.Close()
+}()
 
 	err = db.Ping()
 	if err != nil {
@@ -144,7 +148,9 @@ func authenticatedConnStringTest(ctx context.Context, authConfig Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+    _ = db.Close()
+}()
 	err = db.Ping()
 	if err != nil {
 		return fmt.Errorf("pinging database: %w", err)

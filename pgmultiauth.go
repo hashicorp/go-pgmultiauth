@@ -333,8 +333,8 @@ type tokenGenerator interface {
 func getAuthToken(ctx context.Context, config Config) (*authToken, error) {
 	var tokenGenerator tokenGenerator
 
-	switch {
-	case config.authMethod == AWSAuth:
+	switch config.authMethod {
+	case AWSAuth:
 		connConfig, err := pgx.ParseConfig(config.connString)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse connection string: %v", err)
@@ -346,11 +346,11 @@ func getAuthToken(ctx context.Context, config Config) (*authToken, error) {
 			user:      connConfig.User,
 			awsConfig: config.awsConfig,
 		}
-	case config.authMethod == GCPAuth:
+	case GCPAuth:
 		tokenGenerator = gcpTokenConfig{
 			creds: config.googleCreds,
 		}
-	case config.authMethod == AzureAuth:
+	case AzureAuth:
 		tokenGenerator = azureTokenConfig{
 			creds: config.azureCreds,
 		}

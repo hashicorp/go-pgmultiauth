@@ -32,7 +32,8 @@ type DefaultAuthConfigOptions struct {
 // For Azure, it uses Workload Identity or Managed Identity (MSI) authentication
 // For StandardAuth, it uses the default PostgreSQL authentication
 func DefaultConfig(ctx context.Context, connString string, authOpts DefaultAuthConfigOptions, opts ...ConfigOpt) (Config, error) {
-	if authOpts.AuthMethod == AWSAuth {
+	switch authOpts.AuthMethod {
+	case AWSAuth:
 		if authOpts.AWSDBRegion == "" {
 			return Config{}, fmt.Errorf("AWSDBRegion is required for AWS IAM authentication")
 		}
@@ -43,14 +44,14 @@ func DefaultConfig(ctx context.Context, connString string, authOpts DefaultAuthC
 		}
 
 		opts = append(opts, WithAWSAuth(&cfg))
-	} else if authOpts.AuthMethod == GCPAuth {
+	case GCPAuth: 
 		creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to get GCP credentials: %v", err)
 		}
 
 		opts = append(opts, WithGoogleAuth(creds))
-	} else if authOpts.AuthMethod == AzureAuth {
+	case AzureAuth:
 		// Use a credential chain to support Workload Identity and Managed Identity.
 		var sources []azcore.TokenCredential
 
