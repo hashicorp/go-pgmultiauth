@@ -44,7 +44,7 @@ func DefaultConfig(ctx context.Context, connString string, authOpts DefaultAuthC
 		}
 
 		opts = append(opts, WithAWSAuth(&cfg))
-	case GCPAuth: 
+	case GCPAuth:
 		creds, err := google.FindDefaultCredentials(ctx, "https://www.googleapis.com/auth/cloud-platform")
 		if err != nil {
 			return Config{}, fmt.Errorf("failed to get GCP credentials: %v", err)
