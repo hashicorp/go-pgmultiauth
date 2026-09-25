@@ -41,12 +41,13 @@ func TestConnectivity(t *testing.T) {
 	}
 
 	authMode := StandardAuth
-	if authMethod == "aws" {
+	switch authMethod {
+	case "aws":
 		authMode = AWSAuth
 		require.NotEmpty(t, os.Getenv("AWS_REGION"), "AWS_REGION environment variable is not set")
-	} else if authMethod == "gcp" {
+	case "gcp":
 		authMode = GCPAuth
-	} else if authMethod == "azure" {
+	case "azure":
 		authMode = AzureAuth
 	}
 
