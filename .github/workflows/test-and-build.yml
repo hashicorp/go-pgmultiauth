@@ -39,7 +39,7 @@ jobs:
     strategy:
       matrix:
         go-version:
-          - 'go.mod'
+          - '1.26' # named in go.mod
           - 'oldstable'
           - 'stable'
     env:
@@ -50,8 +50,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@4d34df0c2316fe8122ab82dc22947d607c0c91f9 # v4.0.0
         with:
-          go-version: ${{ matrix.go-version != 'go.mod' && matrix.go-version || '' }}
-          go-version-file: ${{ matrix.go-version == 'go.mod' && 'go.mod' || '' }}
+          go-version: ${{ matrix.go-version }}
       - name: Install gotestsum
         uses: autero1/action-gotestsum@7263b9d73912eec65f46337689e59fac865c425f # v2.0.0
         with:
